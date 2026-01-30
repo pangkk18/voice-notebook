@@ -1,0 +1,79 @@
+{
+	"pages": [
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "今日打卡"
+			}
+		},
+		{
+			"path": "pages/list/list",
+			"style": {
+				"navigationBarTitleText": "我的录音"
+			}
+		},
+		{
+			"path": "pages/profile/profile",
+			"style": {
+				"navigationBarTitleText": "个人中心"
+			}
+		},
+		{
+			"path": "pages/recording/recording",
+			"style": {
+				"navigationBarTitleText": "录制中"
+			}
+		},
+		{
+			"path": "pages/complete/complete",
+			"style": {
+				"navigationBarTitleText": "录制完成"
+			}
+		},
+		{
+			"path": "pages/detail/detail",
+			"style": {
+				"navigationBarTitleText": "详情"
+			}
+		},
+		{
+			"path": "pages/login/login",
+			"style": {
+				"navigationBarTitleText": "登录"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "录音笔记",
+		"navigationBarBackgroundColor": "#F2F2F7",
+		"backgroundColor": "#F2F2F7"
+	},
+	"tabBar": {
+		"color": "#8E8E93",
+		"selectedColor": "#FF3B30",
+		"backgroundColor": "#FFFFFF",
+		"borderStyle": "black",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页",
+				"iconPath": "/static/mic.png",
+				"selectedIconPath": "/static/mic_active.png"
+			},
+			{
+				"pagePath": "pages/list/list",
+				"text": "列表",
+				"iconPath": "/static/list.png",
+				"selectedIconPath": "/static/list_active.png"
+			},
+			{
+				"pagePath": "pages/profile/profile",
+				"text": "我的",
+				"iconPath": "/static/person.png",
+				"selectedIconPath": "/static/person_active.png"
+			}
+		]
+	},
+	"uniIdRouter": {}
+}
