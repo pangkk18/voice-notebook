@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
-import { initCloudBase, checkEnvironment } from "./utils/cloudbase";
+import { initCloudBase, checkEnvironment, initUser } from "./utils/cloudbase";
 
 onLaunch(async () => {
   console.log("App Launch");
@@ -12,6 +12,12 @@ onLaunch(async () => {
       const success = await initCloudBase();
       if (success) {
         console.log("云开发初始化成功");
+        try {
+          const result = await initUser();
+          console.log("initUser 调用结果:", result);
+        } catch (error) {
+          console.warn("initUser 调用失败:", error);
+        }
       } else {
         console.warn("云开发初始化失败");
       }

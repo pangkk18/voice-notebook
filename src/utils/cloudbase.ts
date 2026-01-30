@@ -47,6 +47,34 @@ export const init = (config: any = {}) => {
  */
 export const app = init();
 
+let wxCloudInited = false;
+const ensureWxCloud = () => {
+  if (typeof wx !== "undefined" && wx.cloud && !wxCloudInited) {
+    wx.cloud.init({ env: ENV_ID });
+    wxCloudInited = true;
+  }
+};
+
+type CallFunctionParams = {
+  name: string;
+  data?: Record<string, unknown>;
+};
+
+export async function callCloudFunction<T = any>(params: CallFunctionParams) {
+  if (!checkEnvironment()) {
+    throw new Error("环境ID未配置");
+  }
+
+  if (typeof wx !== "undefined" && wx.cloud && wx.cloud.callFunction) {
+    ensureWxCloud();
+    const { result } = await wx.cloud.callFunction(params);
+    return result as T;
+  }
+
+  const { result } = await app.callFunction(params);
+  return result as T;
+}
+
 
 /**
  * 云开发认证实例
@@ -110,7 +138,7 @@ export const signInWithOpenId = async () => {
     throw new Error('环境ID未配置');
   }
   // 直接调用 auth 模块的同名方法
-  const { data, error } = await auth.signInWithOpenId({ useWxCloud: false });
+  const { data, error } = await auth.signInWithOpenId({ useWxCloud: true });
 
   if (error) {
     throw error;
@@ -252,6 +280,18 @@ export async function initCloudBase() {
 }
 
 /**
+ * 调用 initUser 云函数初始化用户数据
+ */
+export async function initUser() {
+  try {
+    return await callCloudFunction({ name: "initUser", data: {} });
+  } catch (error) {
+    console.error('调用 initUser 云函数失败:', error);
+    throw error;
+  }
+}
+
+/**
  * 退出登录
  * @returns {Promise}
  */
@@ -275,6 +315,8 @@ export default {
   checkEnvironment,
   isValidEnvId,
   initCloudBase,
+  callCloudFunction,
+  initUser,
   signInWithOtp,
   signInWithPassword,
   signInWithPhoneAuth,
