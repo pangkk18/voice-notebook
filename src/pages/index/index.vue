@@ -50,6 +50,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { callCloudFunction } from '../../utils/cloudbase';
 
 // --- State ---
 const isRecordedToday = ref(false);
@@ -64,6 +65,7 @@ const waveAmplitudes = ref(new Array(30).fill(MIN_WAVE_AMP));
 const WAV_SAMPLE_RATE = 16000
 const WAV_CHANNELS = 1
 const WAV_BITS = 16
+let cachedOpenId = null
 
 
 // --- Computed Properties ---
@@ -232,6 +234,31 @@ function savePcmAsWav(tempFilePath) {
 	}))
 }
 
+async function getOpenId() {
+	if (cachedOpenId) return cachedOpenId
+	const res = await callCloudFunction({ name: 'getOpenId', data: {} })
+	if (!res || !res.success || !res.openid) {
+		throw new Error(res?.error || 'OPENID not found')
+	}
+	cachedOpenId = res.openid
+	return cachedOpenId
+}
+
+async function uploadRecordingToCloud(wavPath) {
+	if (!wx?.cloud?.uploadFile) {
+		throw new Error('wx.cloud 未初始化')
+	}
+	const openid = await getOpenId()
+	const fileName = wavPath.split('/').pop() || `recording_${Date.now()}.wav`
+	const cloudPath = `${openid}/original/${fileName}`
+
+	const { fileID } = await wx.cloud.uploadFile({
+		cloudPath,
+		filePath: wavPath
+	})
+
+	return { cloudPath, fileID }
+}
 
 
 // Track peak RMS for simple auto-gain
@@ -256,9 +283,18 @@ onMounted(() => {
 		if (res.tempFilePath) {
 			savePcmAsWav(res.tempFilePath).then((wavPath) => {
 				console.log('WAV saved:', wavPath)
-				uni.showToast({
-					title: '录音已保存',
-					icon: 'success'
+				uploadRecordingToCloud(wavPath).then((uploadRes) => {
+					console.log('Uploaded:', uploadRes)
+					uni.showToast({
+						title: '录音已上传',
+						icon: 'success'
+					})
+				}).catch((err) => {
+					console.error('Upload failed:', err)
+					uni.showToast({
+						title: '上传失败',
+						icon: 'none'
+					})
 				})
 			}).catch((err) => {
 				console.error('Save WAV failed:', err)
