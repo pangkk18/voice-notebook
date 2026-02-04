@@ -37,6 +37,12 @@
 			}
 		},
 		{
+			"path": "pages/player/player",
+			"style": {
+				"navigationBarTitleText": "播放"
+			}
+		},
+		{
 			"path": "pages/login/login",
 			"style": {
 				"navigationBarTitleText": "登录"

@@ -16,7 +16,8 @@
 				</view>
 				<text class="record-prompt">{{ tapToStartMessage }}</text>
 				<view class="waveform">
-					<view class="wave" v-for="i in 5" :key="i"></view>
+					<view class="wave" v-for="w in staticWaves" :key="w.index" :style="{height: `${w.height}px`}">
+					</view>
 				</view>
 			</view>
 		</view>
@@ -66,7 +67,17 @@ const WAV_SAMPLE_RATE = 16000
 const WAV_CHANNELS = 1
 const WAV_BITS = 16
 let cachedOpenId = null
+const pendingRecordingInfo = ref(null)
 
+const staticWaves = [
+	{index: 0, height: 20},
+	{index: 1, height: 40},
+	{index: 2, height: 30},
+	{index: 3, height: 60},
+	{index: 4, height: 30},
+	{index: 5, height: 40},
+	{index: 6, height: 20}
+]
 
 // --- Computed Properties ---
 const greeting = computed(() => {
@@ -127,6 +138,11 @@ const handleRecordClick = () => {
 const handleStopClick = () => {
 	isRecording.value = false;
 	isRecordedToday.value = true;
+	pendingRecordingInfo.value = {
+		duration: elapsedTime.value,
+		title: `录音 ${formatFileTime(new Date())}`,
+		date: formatDisplayTime(new Date())
+	}
 	stopTimer();
 	if (recorderManager) {
 		recorderManager.stop();
@@ -168,6 +184,82 @@ function writeString(view, offset, str) {
 	for (let i = 0; i < str.length; i++) {
 		view.setUint8(offset + i, str.charCodeAt(i))
 	}
+}
+
+function formatDisplayTime(date) {
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const day = String(date.getDate()).padStart(2, '0')
+	const hour = String(date.getHours()).padStart(2, '0')
+	const minute = String(date.getMinutes()).padStart(2, '0')
+	return `${year}年${month}月${day}日 · ${hour}:${minute}`
+}
+
+function formatFileTime(date) {
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const day = String(date.getDate()).padStart(2, '0')
+	const hour = String(date.getHours()).padStart(2, '0')
+	const minute = String(date.getMinutes()).padStart(2, '0')
+	return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+function openPlayerPage(meta, filePath, tempFilePath) {
+	if (!meta) return
+	const params = [
+		`title=${encodeURIComponent(meta.title)}`,
+		`date=${encodeURIComponent(meta.date)}`,
+		`duration=${encodeURIComponent(meta.duration)}`,
+		`localFilePath=${encodeURIComponent(filePath || '')}`,
+		`tempFilePath=${encodeURIComponent(tempFilePath || '')}`
+	].join('&')
+	uni.navigateTo({
+		url: `/pages/player/player?${params}`
+	})
+}
+
+function parseDurationToSeconds(durationText) {
+	const [mins, secs] = String(durationText || '00:00').split(':').map((item) => Number(item))
+	if (!Number.isFinite(mins) || !Number.isFinite(secs)) return 0
+	return mins * 60 + secs
+}
+
+async function saveRecordingToNotebook(meta, tempPath, audioType) {
+	if (!meta || !tempPath) {
+		throw new Error('录音元数据不完整')
+	}
+	const payload = {
+		name: meta.title || '未命名录音',
+		duration: parseDurationToSeconds(meta.duration),
+		temp_path: tempPath,
+		type: audioType || 'audio/wav',
+	}
+	const result = await callCloudFunction({
+		name: 'createNotebookRecord',
+		data: payload
+	})
+	if (!result?.success || !result?.id) {
+		throw new Error(result?.error || 'createNotebookRecord failed')
+	}
+	return result.id
+}
+
+async function updateNotebookUploadInfo(recordId, fileID, cloudPath) {
+	if (!recordId || !fileID || !cloudPath) {
+		throw new Error('更新上传信息参数不完整')
+	}
+	const result = await callCloudFunction({
+		name: 'updateNotebookUpload',
+		data: {
+			id: recordId,
+			fileID,
+			cloudPath
+		}
+	})
+	if (!result?.success) {
+		throw new Error(result?.error || 'updateNotebookUpload failed')
+	}
+	return true
 }
 
 function createWavHeader(dataSize) {
@@ -283,27 +375,53 @@ onMounted(() => {
 		if (res.tempFilePath) {
 			savePcmAsWav(res.tempFilePath).then((wavPath) => {
 				console.log('WAV saved:', wavPath)
-				uploadRecordingToCloud(wavPath).then((uploadRes) => {
-					console.log('Uploaded:', uploadRes)
-					uni.showToast({
-						title: '录音已上传',
-						icon: 'success'
+				openPlayerPage(pendingRecordingInfo.value, wavPath, res.tempFilePath)
+				const snapshot = pendingRecordingInfo.value
+				saveRecordingToNotebook(snapshot, wavPath, 'audio/wav').then((recordId) => {
+					console.log('Notebook record saved:', recordId)
+					pendingRecordingInfo.value = null
+					uploadRecordingToCloud(wavPath).then((uploadRes) => {
+						console.log('Uploaded:', uploadRes)
+						updateNotebookUploadInfo(recordId, uploadRes.fileID, uploadRes.cloudPath).then(() => {
+							console.log('Notebook upload fields updated:', recordId)
+							uni.showToast({
+								title: '录音已上传',
+								icon: 'success'
+							})
+						}).catch((err) => {
+							console.error('Update notebook upload info failed:', err)
+							uni.showToast({
+								title: '上传成功但回写失败',
+								icon: 'none'
+							})
+						})
+					}).catch((err) => {
+						console.error('Upload failed:', err)
+						uni.showToast({
+							title: '上传失败',
+							icon: 'none'
+						})
 					})
 				}).catch((err) => {
-					console.error('Upload failed:', err)
+					console.error('Save notebook data failed:', err)
+					pendingRecordingInfo.value = null
 					uni.showToast({
-						title: '上传失败',
+						title: '录音信息保存失败',
 						icon: 'none'
 					})
 				})
 			}).catch((err) => {
 				console.error('Save WAV failed:', err)
+				openPlayerPage(pendingRecordingInfo.value, '', res.tempFilePath)
+				pendingRecordingInfo.value = null
 				uni.showToast({
 					title: '保存失败',
 					icon: 'none'
 				})
 			})
 		} else {
+			openPlayerPage(pendingRecordingInfo.value, '', '')
+			pendingRecordingInfo.value = null
 			uni.showToast({
 				title: '保存失败',
 				icon: 'none'
@@ -442,15 +560,15 @@ onUnmounted(() => {
 	}
 	
 	.record-prompt {
-		font-size: 12px;
+		font-size: 16px;
 		color: #8E8E93;
-		margin-top: 24px;
+		margin-top: 44px;
 		letter-spacing: 1px;
 	}
 
 	.waveform {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: center;
 		margin-top: 20px;
 		height: 30px;
