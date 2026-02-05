@@ -3,7 +3,7 @@
 		<!-- Idle View -->
 		<view v-if="!isRecording" class="content-wrapper">
 			<view class="streak-chip">
-				<image class="fire-icon" src="/static/icons/fire.svg" />
+				<i class="iconfont icon-fire fire-icon"></i>
 				<text>{{ streak }} days streak</text>
 			</view>
 
@@ -12,7 +12,7 @@
 
 			<view class="recording-area">
 				<view class="record-button" @click="handleRecordClick">
-					<image class="record-icon" src="/static/icons/mic.svg" />
+					<i class="iconfont icon-mic record-icon"></i>
 				</view>
 				<text class="record-prompt">{{ tapToStartMessage }}</text>
 				<view class="waveform">
@@ -36,13 +36,13 @@
 
 			<view class="controls-wrapper">
 				<view class="control-button" @click="handleFlagClick">
-					<image class="control-icon" src="/static/icons/flag.svg" />
+					<i class="iconfont icon-flag control-icon"></i>
 				</view>
 				<view class="stop-button" @click="handleStopClick">
-					<image class="stop-icon" src="/static/icons/stop.svg" />
+					<i class="iconfont icon-stop stop-icon"></i>
 				</view>
 				<view class="control-button" @click="handlePauseClick">
-					<image class="control-icon" src="/static/icons/pause.svg" />
+					<i class="iconfont icon-pause control-icon"></i>
 				</view>
 			</view>
 		</view>
@@ -438,7 +438,8 @@ onMounted(() => {
 			const rms = getRMS(frameBuffer)
 			// Fixed gain + noise gate for stable, responsive visuals
 			const gain = 3.5
-			const gated = rms < 0.002 ? 0 : rms
+			// const gated = rms < 0.002 ? 0 : rms
+			const gated = rms < 0.02 ? 0 : rms
 			const normalized = Math.min(1, gated * gain)
 			// Non-linear boost for small signals, then map to MIN_WAVE_AMP – 140
 			const target = Math.max(MIN_WAVE_AMP, Math.min(140, Math.pow(normalized, 0.6) * 140))
@@ -506,6 +507,7 @@ onUnmounted(() => {
 		.fire-icon {
 			width: 16px;
 			height: 16px;
+			color: $notebook-primary-color;
 			margin-right: 5px;
 		}
 	}
@@ -544,13 +546,14 @@ onUnmounted(() => {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: #FF3B30;
+		background-color: $notebook-primary-color;
 		box-shadow: 0 10px 30px rgba(255, 59, 48, 0.3);
 		transition: all 0.3s ease;
 
 		.record-icon {
-			width: 70px;
-			height: 70px;
+			font-size: 70px;
+			color: #fff;
+			line-height: 1;
 		}
 
 		&.is-recorded {
@@ -596,13 +599,13 @@ onUnmounted(() => {
 	.recording-status {
 		display: flex;
 		align-items: center;
-		color: #FF3B30;
+		color: $notebook-primary-color;
 		font-size: 16px;
 		.red-dot {
 			width: 8px;
 			height: 8px;
 			border-radius: 50%;
-			background-color: #FF3B30;
+			background-color: $notebook-primary-color;
 			margin-right: 8px;
 			animation: pulse 1.5s infinite;
 		}
@@ -645,14 +648,14 @@ onUnmounted(() => {
 		width: 80px;
 		height: 80px;
 		border-radius: 50%;
-		background-color: #FF3B30;
+		background-color: $notebook-primary-color;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		box-shadow: 0 5px 20px rgba(255, 59, 48, 0.3);
 		.stop-icon {
-			width: 35px;
-			height: 35px;
+			font-size: 35px;
+			color: #fff;
 		}
 	}
 	
@@ -666,8 +669,8 @@ onUnmounted(() => {
 		justify-content: center;
 		box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
 		.control-icon {
-			width: 28px;
-			height: 28px;
+			font-size: 28px;
+			color: #000;
 		}
 	}
 

@@ -17,5 +17,14 @@ export default defineConfig({
       }
     },
     allowedHosts: true
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@use "@/assets/styles/_variables.scss" as *;`
+      }
+    },
+    // CSS代码分割优化
+    devSourcemap: true
   }
 });

@@ -30,18 +30,11 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import { callCloudFunction } from '../../utils/cloudbase';
 
 const isLoading = ref(true);
 const recordings = ref([]);
-
-// Mock data
-const mockData = [
-	{ id: 1, title: '关于项目的初步想法', duration: '02:35', date: '2026-01-21', createdAt: '14:30' },
-	{ id: 2, title: '周会要点纪要', duration: '05:12', date: '2026-01-21', createdAt: '10:15' },
-	{ id: 3, title: '一个值得记录的梦', duration: '01:48', date: '2026-01-20', createdAt: '08:55' },
-	{ id: 4, title: '日语学习笔记', duration: '10:05', date: '2026-01-19', createdAt: '21:40' },
-	{ id: 5, title: '新年计划复盘', duration: '03:30', date: '2026-01-19', createdAt: '11:20' },
-];
 
 const groupedRecordings = computed(() => {
 	const groups = {};
@@ -74,11 +67,77 @@ const goToDetail = (id) => {
 	});
 };
 
-// Simulate loading
-setTimeout(() => {
-	recordings.value = mockData;
-	isLoading.value = false;
-}, 1500);
+const normalizeDate = (raw) => {
+	if (!raw) return new Date();
+	if (raw instanceof Date) return raw;
+	if (typeof raw === 'string' || typeof raw === 'number') return new Date(raw);
+	if (typeof raw === 'object') {
+		if (raw.$date) return new Date(raw.$date);
+		if (raw._seconds) return new Date(raw._seconds * 1000);
+		if (raw.seconds) return new Date(raw.seconds * 1000);
+	}
+	return new Date();
+};
+
+const formatDateForItem = (date) => {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+};
+
+const formatTimeForItem = (date) => {
+	const hour = String(date.getHours()).padStart(2, '0');
+	const minute = String(date.getMinutes()).padStart(2, '0');
+	return `${hour}:${minute}`;
+};
+
+const formatDuration = (seconds) => {
+	const total = Number(seconds) || 0;
+	const mins = Math.floor(total / 60);
+	const secs = total % 60;
+	return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+const loadRecordings = async () => {
+	isLoading.value = true;
+	try {
+		const result = await callCloudFunction({
+			name: 'getNotebookList',
+			data: { limit: 200 }
+		});
+		if (!result?.success) {
+			throw new Error(result?.error || 'getNotebookList failed');
+		}
+		const list = Array.isArray(result.data) ? result.data : [];
+		recordings.value = list.map((item) => {
+			const createdAt = normalizeDate(item.create_time);
+			return {
+				id: item._id || item.id,
+				title: item.name || '未命名录音',
+				duration: formatDuration(item.duration),
+				date: formatDateForItem(createdAt),
+				createdAt: formatTimeForItem(createdAt),
+				tempPath: item.temp_path || '',
+				fileID: item.fileID || '',
+				cloudPath: item.cloudPath || ''
+			};
+		});
+	} catch (error) {
+		console.error('Load notebook list failed:', error);
+		uni.showToast({
+			title: '获取录音列表失败',
+			icon: 'none'
+		});
+		recordings.value = [];
+	} finally {
+		isLoading.value = false;
+	}
+};
+
+onShow(() => {
+	loadRecordings();
+});
 
 </script>
 
