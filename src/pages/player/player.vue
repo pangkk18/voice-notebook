@@ -35,19 +35,19 @@
     <view class="actions">
       <view class="action">
         <view class="pill">
-          <image class="icon-sm" src="/static/icons/share.svg" mode="aspectFit" />
+          <i class="iconfont icon-share icon-sm"></i>
         </view>
         <text class="action-text">分享</text>
       </view>
       <view class="action">
         <view class="pill">
-          <image class="icon-sm" src="/static/icons/edit.svg" mode="aspectFit" />
+          <i class="iconfont icon-edit1 icon-sm"></i>
         </view>
         <text class="action-text">重命名</text>
       </view>
       <view class="action">
         <view class="pill danger">
-          <image class="icon-sm" src="/static/icons/trash.svg" mode="aspectFit" />
+          <i class="iconfont icon-delete icon-sm"></i>
         </view>
         <text class="action-text danger-text">删除</text>
       </view>
@@ -58,11 +58,7 @@
         <text class="chip-text">-10s</text>
       </view>
       <view class="play-btn" @click="togglePlay">
-        <image
-          class="play-icon"
-          :src="playing ? '/static/icons/pause.svg' : '/static/icons/play.svg'"
-          mode="aspectFit"
-        />
+        <i class="iconfont play-icon" :class="{'icon-pause': playing, 'icon-play': !playing}"></i>
       </view>
       <view class="chip" @click="seekBy(10)">
         <text class="chip-text">+10s</text>
@@ -87,21 +83,21 @@ const tempFilePath = ref('');
 let audioContext = null;
 
 const bars = ref([
-  { h: 40, active: false },
-  { h: 56, active: false },
-  { h: 74, active: false },
-  { h: 92, active: false },
-  { h: 110, active: false },
-  { h: 132, active: true },
-  { h: 156, active: true },
-  { h: 170, active: true },
-  { h: 156, active: true },
-  { h: 132, active: true },
-  { h: 110, active: false },
-  { h: 92, active: false },
-  { h: 74, active: false },
-  { h: 56, active: false },
-  { h: 40, active: false }
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: true },
+  { h: 10, active: true },
+  { h: 10, active: true },
+  { h: 10, active: true },
+  { h: 10, active: true },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false },
+  { h: 10, active: false }
 ]);
 
 const goBack = () => {
@@ -258,6 +254,7 @@ onUnload(() => {
   position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
   z-index: 1;
   margin-top: 22rpx;
   width: 100%;
@@ -278,8 +275,11 @@ onUnload(() => {
 
 .waveform {
   position: relative;
+  width: 100%;
+  height: 240rpx;
   z-index: 1;
   display: flex;
+  justify-content: center;
   align-items: flex-end;
   gap: 10rpx;
   margin: 40rpx 0 12rpx 12rpx;
@@ -362,8 +362,8 @@ onUnload(() => {
 }
 
 .icon-sm {
-  width: 30rpx;
-  height: 30rpx;
+  font-size: 30rpx;
+  color: #6d717a;
 }
 
 .action-text {
@@ -413,8 +413,8 @@ onUnload(() => {
 }
 
 .play-icon {
-  width: 44rpx;
-  height: 44rpx;
+  font-size: 88rpx;
+  color: #ffffff;
 }
 
 .bottom-fade {

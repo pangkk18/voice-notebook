@@ -1,0 +1,114 @@
+{
+  "id": "5116731",
+  "name": "voice-notebook",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "32731475",
+      "name": "删除",
+      "font_class": "shanchu",
+      "unicode": "e74a",
+      "unicode_decimal": 59210
+    },
+    {
+      "icon_id": "46861881",
+      "name": "bell",
+      "font_class": "bell",
+      "unicode": "e639",
+      "unicode_decimal": 58937
+    },
+    {
+      "icon_id": "46861880",
+      "name": "check",
+      "font_class": "check1",
+      "unicode": "e63a",
+      "unicode_decimal": 58938
+    },
+    {
+      "icon_id": "46861883",
+      "name": "flag",
+      "font_class": "flag",
+      "unicode": "e638",
+      "unicode_decimal": 58936
+    },
+    {
+      "icon_id": "46861887",
+      "name": "stop",
+      "font_class": "stop",
+      "unicode": "e633",
+      "unicode_decimal": 58931
+    },
+    {
+      "icon_id": "46861885",
+      "name": "pause",
+      "font_class": "pause",
+      "unicode": "e634",
+      "unicode_decimal": 58932
+    },
+    {
+      "icon_id": "46861886",
+      "name": "play",
+      "font_class": "play1",
+      "unicode": "e635",
+      "unicode_decimal": 58933
+    },
+    {
+      "icon_id": "46861882",
+      "name": "more",
+      "font_class": "more",
+      "unicode": "e637",
+      "unicode_decimal": 58935
+    },
+    {
+      "icon_id": "46778341",
+      "name": "play",
+      "font_class": "play",
+      "unicode": "e62f",
+      "unicode_decimal": 58927
+    },
+    {
+      "icon_id": "46778342",
+      "name": "fire",
+      "font_class": "fire",
+      "unicode": "e630",
+      "unicode_decimal": 58928
+    },
+    {
+      "icon_id": "46778339",
+      "name": "arrow-right",
+      "font_class": "arrow-right",
+      "unicode": "e631",
+      "unicode_decimal": 58929
+    },
+    {
+      "icon_id": "46778340",
+      "name": "check",
+      "font_class": "check",
+      "unicode": "e632",
+      "unicode_decimal": 58930
+    },
+    {
+      "icon_id": "400058",
+      "name": "录音开启",
+      "font_class": "mic",
+      "unicode": "e62e",
+      "unicode_decimal": 58926
+    },
+    {
+      "icon_id": "14401735",
+      "name": "list",
+      "font_class": "list",
+      "unicode": "e676",
+      "unicode_decimal": 58998
+    },
+    {
+      "icon_id": "14401767",
+      "name": "person",
+      "font_class": "person",
+      "unicode": "e681",
+      "unicode_decimal": 59009
+    }
+  ]
+}
