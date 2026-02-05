@@ -13,13 +13,16 @@
 					<text class="date-header-text">{{ group.date }}</text>
 				</view>
 				<view class="recording-list">
-					<view class="recording-item" v-for="item in group.recordings" :key="item.id" @click="goToDetail(item.id)">
+					<view class="recording-item" v-for="item in group.recordings" :key="item.id" @click="goToDetail(item)">
+						<view class="label">
+							<i class="iconfont icon-mic"></i>
+						</view>
 						<view class="item-info">
 							<text class="item-title">{{ item.title }}</text>
 							<text class="item-meta">{{ item.duration }} • {{ item.createdAt }}</text>
 						</view>
 						<view class="item-play-button">
-							<image class="play-icon" src="/static/icons/play.svg" />
+							<i class="iconfont icon-play play-icon"></i>
 						</view>
 					</view>
 				</view>
@@ -61,9 +64,18 @@ const formatDateForGrouping = (dateString) => {
 	return `${inputDate.getFullYear()}年${inputDate.getMonth() + 1}月${inputDate.getDate()}日`;
 }
 
-const goToDetail = (id) => {
+const goToDetail = (item) => {
+	if (!item) return;
+	const dateText = item.date && item.createdAt ? `${item.date} ${item.createdAt}` : (item.date || item.createdAt || '');
+	const params = [
+		`title=${encodeURIComponent(item.title || '')}`,
+		`date=${encodeURIComponent(dateText)}`,
+		`duration=${encodeURIComponent(item.duration || '')}`,
+		`localFilePath=${encodeURIComponent(item.tempPath || '')}`,
+		`tempFilePath=${encodeURIComponent(item.tempPath || '')}`
+	].join('&');
 	uni.navigateTo({
-		url: `/pages/detail/detail?id=${id}`
+		url: `/pages/player/player?${params}`
 	});
 };
 
@@ -170,6 +182,7 @@ onShow(() => {
 
 .recording-item {
 	display: flex;
+	justify-content: space-between;
 	align-items: center;
 	padding: $uni-spacing-col-base $uni-spacing-row-base;
 	border-bottom: 1px solid $uni-border-color;
@@ -182,40 +195,54 @@ onShow(() => {
     &:active {
         background-color: $uni-bg-color-hover;
     }
-
+	.label{
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		background-color: $notebook-light-color;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		.iconfont {
+			font-size: 24px;
+			color: $notebook-primary-color;
+		}
+	}
 	.item-info {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
+		padding: 0rpx 14rpx;
+		box-sizing: border-box;
 	}
 
 	.item-title {
-		font-size: $uni-font-size-lg;
-		color: $uni-text-color;
+		font-size: 14px;
+		color: #000000;
 		font-weight: 500;
 		margin-bottom: $uni-spacing-col-sm;
 	}
 
 	.item-meta {
-		font-size: $uni-font-size-sm;
-		color: $uni-text-color-grey;
+		font-size: 12px;
+		color: #999999;
 	}
 
 	.item-play-button {
 		width: 44px;
 		height: 44px;
 		border-radius: 50%;
-		background-color: $uni-bg-color-grey;
+		background-color: $notebook-primary-color;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		margin-left: $uni-spacing-row-base;
+		.play-icon {
+			font-size: 24px;
+			color: #ffffff;
+		}
 	}
 
-	.play-icon {
-		width: 24px;
-		height: 24px;
-	}
 }
 
 .empty-state {
