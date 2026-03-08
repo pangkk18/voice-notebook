@@ -33,6 +33,21 @@ exports.main = async (event) => {
       }
     });
 
+    // 异步触发 MP3 转换（不等待转换完成）
+    cloud.callFunction({
+      name: 'convertAudioToMp3',
+      data: {
+        fileID,
+        cloudPath,
+        recordId: id,
+        openid: OPENID
+      }
+    }).then(result => {
+      console.log('MP3 conversion triggered:', result);
+    }).catch(err => {
+      console.error('Failed to trigger MP3 conversion:', err);
+    });
+
     return {
       success: true
     };

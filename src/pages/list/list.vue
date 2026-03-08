@@ -68,11 +68,16 @@ const goToDetail = (item) => {
 	if (!item) return;
 	const dateText = item.date && item.createdAt ? `${item.date} ${item.createdAt}` : (item.date || item.createdAt || '');
 	const params = [
+		`recordId=${encodeURIComponent(item.id || '')}`,
 		`title=${encodeURIComponent(item.title || '')}`,
 		`date=${encodeURIComponent(dateText)}`,
 		`duration=${encodeURIComponent(item.duration || '')}`,
 		`localFilePath=${encodeURIComponent(item.tempPath || '')}`,
-		`tempFilePath=${encodeURIComponent(item.tempPath || '')}`
+		`tempFilePath=${encodeURIComponent(item.tempPath || '')}`,
+		`cloudFileID=${encodeURIComponent(item.cloudFileID || '')}`,
+		`cloudMp3FileID=${encodeURIComponent(item.cloudMp3FileID || '')}`,
+		`cloudM3u8FileID=${encodeURIComponent(item.cloudM3u8FileID || '')}`,
+		`conversionStatus=${encodeURIComponent(item.conversionStatus || '')}`
 	].join('&');
 	uni.navigateTo({
 		url: `/pages/player/player?${params}`
@@ -131,7 +136,10 @@ const loadRecordings = async () => {
 				date: formatDateForItem(createdAt),
 				createdAt: formatTimeForItem(createdAt),
 				tempPath: item.temp_path || '',
-				fileID: item.fileID || '',
+				cloudFileID: item.fileID || '',
+				cloudMp3FileID: item.mp3FileID || '',
+				cloudM3u8FileID: item.m3u8FileID || '',
+				conversionStatus: item.conversion_status || '',
 				cloudPath: item.cloudPath || ''
 			};
 		});

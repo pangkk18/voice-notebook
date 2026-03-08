@@ -204,14 +204,16 @@ function formatFileTime(date) {
 	return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-function openPlayerPage(meta, filePath, tempFilePath) {
+function openPlayerPage(meta, filePath, tempFilePath, cloudFileID, cloudMp3FileID) {
 	if (!meta) return
 	const params = [
 		`title=${encodeURIComponent(meta.title)}`,
 		`date=${encodeURIComponent(meta.date)}`,
 		`duration=${encodeURIComponent(meta.duration)}`,
 		`localFilePath=${encodeURIComponent(filePath || '')}`,
-		`tempFilePath=${encodeURIComponent(tempFilePath || '')}`
+		`tempFilePath=${encodeURIComponent(tempFilePath || '')}`,
+		`cloudFileID=${encodeURIComponent(cloudFileID || '')}`,
+		`cloudMp3FileID=${encodeURIComponent(cloudMp3FileID || '')}`
 	].join('&')
 	uni.navigateTo({
 		url: `/pages/player/player?${params}`

@@ -72,6 +72,7 @@
 <script setup>
 import { ref } from 'vue';
 import { onLoad, onUnload } from '@dcloudio/uni-app';
+import { callCloudFunction } from '../../utils/cloudbase';
 
 const playing = ref(false);
 const duration = ref(155);
@@ -80,38 +81,33 @@ const recordTitle = ref('未命名录音');
 const recordDate = ref('未记录时间');
 const localFilePath = ref('');
 const tempFilePath = ref('');
+const recordId = ref('');
+const cloudFileID = ref('');
+const cloudMp3FileID = ref('');
+const cloudM3u8FileID = ref('');
+const conversionStatus = ref('');
+const currentSourceKind = ref('');
+const localFallbackTried = ref(false);
+const signedManifestLocalPath = ref('');
+const muteHintShown = ref(false);
 let audioContext = null;
+let playbackStallTimer = null;
+let waveformTimer = null;
+let waveformTick = 0;
 
-const bars = ref([
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: true },
-  { h: 10, active: true },
-  { h: 10, active: true },
-  { h: 10, active: true },
-  { h: 10, active: true },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false },
-  { h: 10, active: false }
-]);
+const BAR_COUNT = 15;
+const BASE_WAVE_BARS = [18, 26, 20, 34, 22, 28, 24, 30, 22, 34, 20, 26, 18, 24, 20];
+
+const bars = ref(BASE_WAVE_BARS.map((h) => ({ h, active: false })));
 
 const goBack = () => {
   uni.navigateBack();
 };
 
-const togglePlay = () => {
+const togglePlay = async () => {
   if (!audioContext) {
-    const playablePath = localFilePath.value || tempFilePath.value;
-    if (!playablePath) {
-      uni.showToast({ title: '没有可播放的音频', icon: 'none' });
-      return;
-    }
-    initAudio(playablePath);
+    await initPreferredSource();
+    if (!audioContext) return;
   }
   if (playing.value) {
     audioContext.pause();
@@ -120,12 +116,17 @@ const togglePlay = () => {
   }
 };
 
+const isConversionCompleted = () => {
+  return conversionStatus.value === 'completed' && Boolean(cloudM3u8FileID.value);
+};
+
 const onSliderChange = (event) => {
   const next = Number(event.detail.value) || 0;
   current.value = next;
   if (audioContext) {
     audioContext.seek(next);
   }
+  updateWaveformProgress();
 };
 
 const formatTime = (seconds) => {
@@ -157,33 +158,241 @@ const seekBy = (delta) => {
   if (audioContext) {
     audioContext.seek(next);
   }
+  updateWaveformProgress();
+};
+
+const updateWaveformProgress = () => {
+  const total = Math.max(duration.value, 1);
+  const ratio = Math.min(Math.max(current.value / total, 0), 1);
+  const activeCount = Math.round(ratio * BAR_COUNT);
+  bars.value = bars.value.map((bar, idx) => ({
+    ...bar,
+    active: idx < activeCount
+  }));
+};
+
+const startWaveformAnimation = () => {
+  stopWaveformAnimation();
+  waveformTimer = setInterval(() => {
+    if (!playing.value) return;
+    waveformTick += 1;
+    const now = Number(audioContext?.currentTime || 0);
+    bars.value = BASE_WAVE_BARS.map((base, idx) => {
+      const p1 = Math.abs(Math.sin(now * 4 + idx * 0.62 + waveformTick * 0.12));
+      const p2 = Math.abs(Math.cos(now * 2.2 - idx * 0.41 + waveformTick * 0.08));
+      const amp = 0.55 * p1 + 0.45 * p2;
+      const h = Math.round(base + amp * 48);
+      return { h, active: bars.value[idx]?.active || false };
+    });
+    updateWaveformProgress();
+  }, 120);
+};
+
+const stopWaveformAnimation = () => {
+  if (waveformTimer) {
+    clearInterval(waveformTimer);
+    waveformTimer = null;
+  }
+};
+
+const isLocalFileUsable = async (filePath) => {
+  if (!filePath) return false;
+  if (!wx?.getFileSystemManager) return true;
+  const fs = wx.getFileSystemManager();
+  return new Promise((resolve) => {
+    fs.access({
+      path: filePath,
+      success: () => resolve(true),
+      fail: () => resolve(false)
+    });
+  });
+};
+
+// 从云端加载文件
+const loadCloudFile = async (inputFileID, autoPlay = false) => {
+  const fileID = inputFileID || cloudM3u8FileID.value || cloudMp3FileID.value || cloudFileID.value;
+  if (!fileID) {
+    return false;
+  }
+
+  try {
+    // 获取云存储文件的临时 URL
+    if (!wx?.cloud?.getTempFileURL) {
+      uni.showToast({ title: '云存储不可用', icon: 'none' });
+      return false;
+    }
+
+    const result = await wx.cloud.getTempFileURL({
+      fileList: [fileID]
+    });
+
+    if (result.fileList && result.fileList.length > 0) {
+      const tempURL = result.fileList[0].tempFileURL;
+      if (tempURL) {
+        initAudio(tempURL);
+        currentSourceKind.value = 'cloud';
+        if (autoPlay && audioContext) {
+          setTimeout(() => {
+            audioContext && audioContext.play();
+          }, 60);
+        }
+        return true;
+      } else {
+        uni.showToast({ title: '获取播放地址失败', icon: 'none' });
+        return false;
+      }
+    } else {
+      uni.showToast({ title: '获取播放地址失败', icon: 'none' });
+      return false;
+    }
+  } catch (err) {
+    console.error('Load cloud file failed:', err);
+    uni.showToast({ title: '加载音频失败', icon: 'none' });
+    return false;
+  }
+};
+
+const refreshRecordStatus = async () => {
+  if (!recordId.value) return;
+  try {
+    const result = await callCloudFunction({
+      name: 'getNotebookList',
+      data: { limit: 200 }
+    });
+    if (!result?.success || !Array.isArray(result.data)) return;
+    const latest = result.data.find((item) => item?._id === recordId.value);
+    if (!latest) return;
+
+    conversionStatus.value = latest.conversion_status || '';
+    cloudM3u8FileID.value = latest.m3u8FileID || cloudM3u8FileID.value;
+    cloudMp3FileID.value = latest.mp3FileID || cloudMp3FileID.value;
+    cloudFileID.value = latest.fileID || cloudFileID.value;
+    if (!tempFilePath.value && latest.temp_path) {
+      tempFilePath.value = latest.temp_path;
+    }
+  } catch (error) {
+    console.warn('refreshRecordStatus failed:', error);
+  }
+};
+
+const initPreferredSource = async () => {
+  localFallbackTried.value = false;
+  await refreshRecordStatus();
+
+  // 转换完成后优先 m3u8
+  if (isConversionCompleted()) {
+    const ok = await loadSignedManifestAndPlay();
+    if (ok) return;
+  }
+
+  // 未转换完成优先本地临时 wav
+  const localPlayablePath = localFilePath.value || tempFilePath.value;
+  if (localPlayablePath && await isLocalFileUsable(localPlayablePath)) {
+    initAudio(localPlayablePath);
+    currentSourceKind.value = 'local';
+    return;
+  }
+
+  // 本地不可用时兜底云端文件
+  const fallbackID = cloudMp3FileID.value || cloudFileID.value || cloudM3u8FileID.value;
+  const ok = await loadCloudFile(fallbackID);
+  if (!ok) {
+    uni.showToast({ title: '没有可播放的音频', icon: 'none' });
+  }
+};
+
+const loadSignedManifestAndPlay = async () => {
+  if (!recordId.value) return false;
+  try {
+    const result = await callCloudFunction({
+      name: 'getHlsPlayableManifest',
+      data: {
+        recordId: recordId.value,
+        maxAge: 3600
+      }
+    });
+    if (!result?.success || !result?.signedManifest) {
+      return false;
+    }
+
+    const localPath = await writeSignedManifestToLocal(result.signedManifest);
+    if (!localPath) return false;
+    signedManifestLocalPath.value = localPath;
+    initAudio(localPath);
+    currentSourceKind.value = 'hls-manifest';
+    return true;
+  } catch (error) {
+    console.warn('loadSignedManifestAndPlay failed:', error);
+    return false;
+  }
+};
+
+const writeSignedManifestToLocal = async (manifestText) => {
+  if (!manifestText || typeof manifestText !== 'string') return '';
+  if (!wx?.getFileSystemManager || !wx?.env?.USER_DATA_PATH) return '';
+
+  const fs = wx.getFileSystemManager();
+  const fileName = `hls_${recordId.value || Date.now()}_${Date.now()}.m3u8`;
+  const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`;
+
+  return new Promise((resolve) => {
+    fs.writeFile({
+      filePath,
+      data: manifestText,
+      encoding: 'utf8',
+      success: () => resolve(filePath),
+      fail: (err) => {
+        console.warn('writeSignedManifestToLocal failed:', err);
+        resolve('');
+      }
+    });
+  });
 };
 
 const initAudio = (src) => {
+  clearPlaybackStallTimer();
+  stopWaveformAnimation();
+  waveformTick = 0;
   if (audioContext) {
     audioContext.destroy();
   }
   audioContext = uni.createInnerAudioContext();
   audioContext.src = src;
   audioContext.autoplay = false;
+  // iOS: allow playback even when mute switch is on.
+  audioContext.obeyMuteSwitch = false;
 
   audioContext.onPlay(() => {
     playing.value = true;
+    schedulePlaybackStallHint();
+    startWaveformAnimation();
   });
   audioContext.onPause(() => {
     playing.value = false;
+    clearPlaybackStallTimer();
+    stopWaveformAnimation();
   });
   audioContext.onStop(() => {
     playing.value = false;
+    clearPlaybackStallTimer();
+    stopWaveformAnimation();
   });
   audioContext.onEnded(() => {
     playing.value = false;
     current.value = duration.value;
+    clearPlaybackStallTimer();
+    stopWaveformAnimation();
+    updateWaveformProgress();
   });
   audioContext.onTimeUpdate(() => {
     current.value = Math.floor(audioContext.currentTime || 0);
     if (audioContext.duration && Number.isFinite(audioContext.duration)) {
       duration.value = Math.max(Math.floor(audioContext.duration), 1);
+    }
+    updateWaveformProgress();
+    if ((audioContext.currentTime || 0) > 0.2) {
+      clearPlaybackStallTimer();
+      muteHintShown.value = false;
     }
   });
   audioContext.onCanplay(() => {
@@ -192,9 +401,41 @@ const initAudio = (src) => {
     }
   });
   audioContext.onError(() => {
+    if ((currentSourceKind.value === 'local' || currentSourceKind.value === 'hls-manifest') && !localFallbackTried.value) {
+      localFallbackTried.value = true;
+      const fallbackID = cloudMp3FileID.value || cloudFileID.value || cloudM3u8FileID.value;
+      loadCloudFile(fallbackID, true);
+      return;
+    }
     uni.showToast({ title: '音频播放失败', icon: 'none' });
     playing.value = false;
+    clearPlaybackStallTimer();
+    stopWaveformAnimation();
   });
+};
+
+const schedulePlaybackStallHint = () => {
+  clearPlaybackStallTimer();
+  playbackStallTimer = setTimeout(() => {
+    if (!audioContext || !playing.value) return;
+    // Started playing but still no progress, often caused by mute/very low volume.
+    const t = Number(audioContext.currentTime || 0);
+    if (t < 0.2 && !muteHintShown.value) {
+      muteHintShown.value = true;
+      uni.showToast({
+        title: '若无声音，请关闭静音并调高媒体音量',
+        icon: 'none',
+        duration: 2200
+      });
+    }
+  }, 1500);
+};
+
+const clearPlaybackStallTimer = () => {
+  if (playbackStallTimer) {
+    clearTimeout(playbackStallTimer);
+    playbackStallTimer = null;
+  }
 };
 
 onLoad((options) => {
@@ -213,17 +454,42 @@ onLoad((options) => {
   if (options?.tempFilePath) {
     tempFilePath.value = decodeParam(options.tempFilePath);
   }
-
-  const playablePath = localFilePath.value || tempFilePath.value;
-  if (playablePath) {
-    initAudio(playablePath);
+  if (options?.recordId) {
+    recordId.value = decodeParam(options.recordId);
   }
+  if (options?.conversionStatus) {
+    conversionStatus.value = decodeParam(options.conversionStatus);
+  }
+  // 支持从云端文件播放
+  if (options?.cloudFileID) {
+    cloudFileID.value = decodeParam(options.cloudFileID);
+  }
+  if (options?.cloudMp3FileID) {
+    cloudMp3FileID.value = decodeParam(options.cloudMp3FileID);
+  }
+  if (options?.cloudM3u8FileID) {
+    cloudM3u8FileID.value = decodeParam(options.cloudM3u8FileID);
+  }
+
+  initPreferredSource();
 });
 
 onUnload(() => {
+  clearPlaybackStallTimer();
+  stopWaveformAnimation();
   if (audioContext) {
     audioContext.destroy();
     audioContext = null;
+  }
+  if (signedManifestLocalPath.value && wx?.getFileSystemManager) {
+    try {
+      wx.getFileSystemManager().unlink({
+        filePath: signedManifestLocalPath.value,
+        fail: () => {}
+      });
+    } catch (error) {
+      console.warn('cleanup signed manifest failed:', error);
+    }
   }
 });
 </script>

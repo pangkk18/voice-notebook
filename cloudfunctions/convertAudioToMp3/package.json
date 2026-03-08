@@ -1,0 +1,9 @@
+{
+  "name": "convertAudioToMp3",
+  "version": "1.0.0",
+  "description": "Convert WAV audio files to MP3 format using FFmpeg",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "^3.0.0"
+  }
+}
