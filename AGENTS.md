@@ -5,6 +5,34 @@ alwaysApply: true
 inclusion: always
 ---
 
+# Voice Notebook Project Context
+
+This repository is no longer a generic CloudBase AI demo. It is a **Voice Notebook / 录音打卡小程序** built by modifying Tencent CloudBase's official `uniapp` mini-program demo.
+
+## Project Identity
+
+- **Project type**: uni-app based WeChat mini-program, with Tencent CloudBase as backend
+- **Primary goal**: let users complete daily audio check-ins, keep personal recording history, and play back past recordings
+- **Current frontend pages**: `index` (今日打卡), `recording`, `complete`, `list`, `detail`, `player`, `profile`, `login`
+- **Current backend focus**: Cloud functions and CloudBase database/storage around notebook records rather than generic AI demo flows
+- **Primary language**: Chinese product semantics, but technical docs and rules can stay bilingual when needed
+
+## Project-Specific Working Rules
+
+1. Preserve the existing CloudBase framework, tools, rule references, workflow constraints, and deployment conventions in this file.
+2. When describing the repository, always treat it as a **recording check-in mini-program**, not as a generic AI demo/template project.
+3. If you see old demo wording such as generic "AI project", "template", or unrelated sample-business descriptions, rewrite it into Voice Notebook terminology unless the user explicitly asks to keep the original wording.
+4. When explaining business logic, prioritize the real modules already present in the repository:
+   - `src/pages/*` for check-in, recording, list, playback, and profile flows
+   - `src/utils/cloudbase.ts` for CloudBase initialization and auth helpers
+   - `cloudfunctions/createNotebookRecord`
+   - `cloudfunctions/updateNotebookUpload`
+   - `cloudfunctions/getNotebookList`
+   - `cloudfunctions/getHlsPlayableManifest`
+   - `cloudfunctions/convertAudioToMp3`
+5. Do not introduce fictional AI capabilities into project summaries unless the current task is explicitly adding an AI feature.
+6. Prefer describing the app as "录音打卡小程序" or "Voice Notebook" consistently across generated docs.
+
 # CloudBase AI Development Rules Guide
 
 ## 🗂️ Rule File Path Resolution Strategy
