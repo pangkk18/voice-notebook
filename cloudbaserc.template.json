@@ -1,5 +1,5 @@
 {
-  "envId": "voice-notebook-6gvpvq9ha3b373f5",
+  "envId": "<your-cloudbase-env-id>",
   "framework": {
     "name": "uniapp",
     "plugins": {
@@ -18,4 +18,4 @@
       }
     }
   }
-} 
+}

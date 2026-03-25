@@ -4,11 +4,15 @@ import adapter from '@cloudbase/adapter-uni-app'
 // 使用 UniApp 适配器
 cloudbase.useAdapters(adapter, { uni: uni });
 
-// 云开发环境ID，使用时请替换为您的环境ID
-const ENV_ID: string = 'voice-notebook-6gvpvq9ha3b373f5';
+const RAW_ENV_ID = String(import.meta.env.VITE_CLOUDBASE_ENV_ID || '').trim();
+const ENV_ID: string = RAW_ENV_ID;
 
 // 检查环境ID是否已配置
-export const isValidEnvId = ENV_ID && ENV_ID !== 'your env id';
+export const isValidEnvId = Boolean(
+  ENV_ID &&
+  ENV_ID !== 'your env id' &&
+  ENV_ID !== '<your-cloudbase-env-id>'
+);
 
 // 客户端Publishable Key, 可前往https://tcb.cloud.tencent.com/dev?envId={env}#/env/apikey获取
 const PUBLISHABLE_KEY = import.meta.env.VITE_PUBLISHABLE_KEY || "";
@@ -60,6 +64,27 @@ type CallFunctionParams = {
   data?: Record<string, unknown>;
 };
 
+export type NotebookUserProfile = {
+  _id?: string;
+  openid: string;
+  nickName?: string;
+  avatarUrl?: string;
+  gender?: number;
+  country?: string;
+  province?: string;
+  city?: string;
+  language?: string;
+  totalSpace?: number;
+  usedSpace?: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+type UserProfilePayload = Pick<
+  NotebookUserProfile,
+  "nickName" | "avatarUrl" | "gender" | "country" | "province" | "city" | "language"
+>;
+
 export async function callCloudFunction<T = any>(params: CallFunctionParams) {
   if (!checkEnvironment()) {
     throw new Error("环境ID未配置");
@@ -86,7 +111,7 @@ export const auth = app.auth;
  */
 export const checkEnvironment = () => {
   if (!isValidEnvId) {
-    const message = '❌ 云开发环境ID未配置\n\n请按以下步骤配置：\n1. 打开 src/utils/cloudbase.ts 文件\n2. 将 ENV_ID 变量的值替换为您的云开发环境ID\n3. 保存文件并重新运行\n\n获取环境ID：https://console.cloud.tencent.com/tcb';
+    const message = '❌ 云开发环境ID未配置\n\n请按以下步骤配置：\n1. 在项目根目录创建 .env.local 文件\n2. 添加 VITE_CLOUDBASE_ENV_ID=你的云开发环境ID\n3. 如需客户端密钥，再添加 VITE_PUBLISHABLE_KEY=你的客户端 Publishable Key\n4. 保存后重新运行\n\n获取环境ID：https://console.cloud.tencent.com/tcb';
     console.error(message);
     return false;
   }
@@ -292,6 +317,36 @@ export async function initUser() {
 }
 
 /**
+ * 获取当前小程序用户资料
+ */
+export async function getUserProfile() {
+  try {
+    return await callCloudFunction<{ success: boolean; user?: NotebookUserProfile; error?: string }>({
+      name: "getUserProfile",
+      data: {}
+    });
+  } catch (error) {
+    console.error('调用 getUserProfile 云函数失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 使用微信授权资料更新当前用户信息
+ */
+export async function upsertUserProfile(userInfo: UserProfilePayload) {
+  try {
+    return await callCloudFunction<{ success: boolean; user?: NotebookUserProfile; error?: string }>({
+      name: "upsertUserProfile",
+      data: { userInfo }
+    });
+  } catch (error) {
+    console.error('调用 upsertUserProfile 云函数失败:', error);
+    throw error;
+  }
+}
+
+/**
  * 退出登录
  * @returns {Promise}
  */
@@ -317,8 +372,10 @@ export default {
   initCloudBase,
   callCloudFunction,
   initUser,
+  getUserProfile,
   signInWithOtp,
   signInWithPassword,
   signInWithPhoneAuth,
-  signInWithOpenId
+  signInWithOpenId,
+  upsertUserProfile
 };

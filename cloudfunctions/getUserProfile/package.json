@@ -1,0 +1,9 @@
+{
+  "name": "getUserProfile",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@cloudbase/manager-node": "latest",
+    "wx-server-sdk": "^3.0.0"
+  }
+}

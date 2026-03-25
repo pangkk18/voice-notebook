@@ -52,13 +52,13 @@
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "录音笔记",
-		"navigationBarBackgroundColor": "#F2F2F7",
-		"backgroundColor": "#F2F2F7"
+		"navigationBarBackgroundColor": "#F4EFE6",
+		"backgroundColor": "#F4EFE6"
 	},
 	"tabBar": {
-		"color": "#8E8E93",
-		"selectedColor": "#FF3B30",
-		"backgroundColor": "#FFFFFF",
+		"color": "#7A746B",
+		"selectedColor": "#C46A2D",
+		"backgroundColor": "#FFF9F1",
 		"borderStyle": "black",
 		"list": [
 			{

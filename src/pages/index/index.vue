@@ -477,14 +477,18 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss">
+	@import "@/styles/notebook-theme.scss";
+
 	.home-container {
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
-		background-color: #F8F8F8;
+		background:
+			linear-gradient(180deg, $vn-bg 0%, $vn-bg-alt 42%, $vn-bg-soft 100%);
 		padding: 0 24px;
 		box-sizing: border-box;
 		align-items: center;
+		color: $vn-text;
 	}
 
 	// --- Idle State Styles ---
@@ -500,16 +504,17 @@ onUnmounted(() => {
 	.streak-chip {
 		display: flex;
 		align-items: center;
-		background-color: #FFECEB;
+		background-color: $vn-primary-soft;
+		border: 1px solid $vn-border-strong;
 		border-radius: 20px;
 		padding: 6px 12px;
 		font-size: 14px;
-		color: #FF3B30;
+		color: $vn-primary;
 
 		.fire-icon {
 			width: 16px;
 			height: 16px;
-			color: $notebook-primary-color;
+			color: $vn-primary;
 			margin-right: 5px;
 		}
 	}
@@ -517,13 +522,13 @@ onUnmounted(() => {
 	.greeting {
 		font-size: 32px;
 		font-weight: bold;
-		color: #000;
+		color: $vn-text;
 		margin-top: 24px;
 	}
 
 	.subtitle {
 		font-size: 16px;
-		color: #8E8E93;
+		color: $vn-text-muted;
 		margin-top: 8px;
 	}
 
@@ -534,11 +539,12 @@ onUnmounted(() => {
 		justify-content: center;
 		width: 240px;
 		height: 360px;
-		background-color: #FFF;
-		border: 10px solid #FFECEB;
+		background-color: $vn-surface;
+		border: 10px solid rgba(196, 106, 45, 0.14);
 		border-radius: 130px;
 		margin-top: 40px;
 		cursor: pointer;
+		box-shadow: $vn-shadow;
 	}
 
 	.record-button {
@@ -548,8 +554,8 @@ onUnmounted(() => {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: $notebook-primary-color;
-		box-shadow: 0 10px 30px rgba(255, 59, 48, 0.3);
+		background-color: $vn-primary;
+		box-shadow: 0 10px 30px $vn-primary-glow;
 		transition: all 0.3s ease;
 
 		.record-icon {
@@ -559,14 +565,14 @@ onUnmounted(() => {
 		}
 
 		&.is-recorded {
-			background-color: #4CD964; // Green for completed
-			box-shadow: 0 5px 15px rgba(76, 217, 100, 0.3);
+			background-color: $vn-secondary;
+			box-shadow: 0 5px 15px rgba(122, 142, 118, 0.3);
 		}
 	}
 	
 	.record-prompt {
 		font-size: 16px;
-		color: #8E8E93;
+		color: $vn-text-muted;
 		margin-top: 44px;
 		letter-spacing: 1px;
 	}
@@ -580,7 +586,7 @@ onUnmounted(() => {
 		.wave {
 			width: 4px;
 			height: 10px;
-			background-color: #FFCBDC;
+			background-color: rgba(196, 106, 45, 0.26);
 			margin: 0 2px;
 			border-radius: 2px;
 		}
@@ -601,13 +607,13 @@ onUnmounted(() => {
 	.recording-status {
 		display: flex;
 		align-items: center;
-		color: $notebook-primary-color;
+		color: $vn-primary;
 		font-size: 16px;
 		.red-dot {
 			width: 8px;
 			height: 8px;
 			border-radius: 50%;
-			background-color: $notebook-primary-color;
+			background-color: $vn-primary;
 			margin-right: 8px;
 			animation: pulse 1.5s infinite;
 		}
@@ -615,7 +621,7 @@ onUnmounted(() => {
 	
 	.timer {
 		font-size: 64px;
-		color: #000;
+		color: $vn-text;
 		font-family: 'Courier New', Courier, monospace;
 	}
 	
@@ -627,7 +633,7 @@ onUnmounted(() => {
 		.wave-active {
 			width: 3px;
 			height: 12px;
-			background-color: #FF8FAB;
+			background-color: rgba(196, 106, 45, 0.7);
 			margin: 0 2px;
 			border-radius: 2px;
 			transition: height 0.1s ease-out;
@@ -636,7 +642,7 @@ onUnmounted(() => {
 	
 	.recording-instruction {
 		font-size: 14px;
-		color: #8E8E93;
+		color: $vn-text-muted;
 	}
 
 	.controls-wrapper {
@@ -650,11 +656,11 @@ onUnmounted(() => {
 		width: 80px;
 		height: 80px;
 		border-radius: 50%;
-		background-color: $notebook-primary-color;
+		background-color: $vn-primary;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 5px 20px rgba(255, 59, 48, 0.3);
+		box-shadow: 0 5px 20px $vn-primary-glow;
 		.stop-icon {
 			font-size: 35px;
 			color: #fff;
@@ -665,14 +671,15 @@ onUnmounted(() => {
 		width: 60px;
 		height: 60px;
 		border-radius: 50%;
-		background-color: #fff;
+		background-color: $vn-surface-strong;
+		border: 1px solid $vn-border;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+		box-shadow: $vn-shadow;
 		.control-icon {
 			font-size: 28px;
-			color: #000;
+			color: $vn-text;
 		}
 	}
 

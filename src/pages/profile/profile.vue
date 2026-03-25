@@ -1,195 +1,618 @@
 <template>
 	<view class="profile-container">
-		<view class="user-card-wrapper">
-			<view v-if="!user" class="user-card not-logged-in" @click="goToLogin">
-				<view class="avatar-placeholder"></view>
-				<text class="login-prompt">点击登录</text>
+		<view class="profile-hero">
+			<view
+				class="user-card"
+				:class="{ 'user-card--guest': !hasAuthorizedProfile }"
+				@click="openProfileEditor"
+			>
+				<view class="identity-copy">
+					<text class="eyebrow">VOICE NOTEBOOK DOSSIER</text>
+					<text class="card-title">
+						{{ hasAuthorizedProfile ? user?.nickName || '微信用户' : '点击同步微信资料' }}
+					</text>
+					<text class="card-desc">
+						{{
+							hasAuthorizedProfile
+								? '头像与昵称已同步到云端，可跨设备继续查看录音记录。'
+								: '首次授权后会保存头像昵称到后端，仅用于个人信息展示与录音归属识别。'
+						}}
+					</text>
+				</view>
+				<view class="identity-side">
+					<view class="status-badge" :class="{ 'status-badge--ready': hasAuthorizedProfile }">
+						{{ hasAuthorizedProfile ? '已同步' : '未授权' }}
+					</view>
+					<image
+						v-if="hasAuthorizedProfile && user?.avatarUrl"
+						class="avatar"
+						:src="user.avatarUrl"
+						mode="aspectFill"
+					/>
+					<view v-else class="avatar-placeholder">
+						<i class="iconfont icon-user"></i>
+					</view>
+				</view>
 			</view>
-			<view v-else class="user-card">
-				<image class="avatar" :src="user.avatarUrl" mode="aspectFill" />
-				<text class="nickname">{{ user.nickName }}</text>
+			<view class="hero-note">
+				<text class="hero-note__label">当前身份</text>
+				<text class="hero-note__value">{{ hasAuthorizedProfile ? '微信资料已绑定' : '等待微信资料授权' }}</text>
 			</view>
 		</view>
 
 		<view class="storage-card">
-			<view class="storage-info">
-				<text class="storage-title">已用空间</text>
-				<text class="storage-text">{{ storage.used }} / {{ storage.total }}</text>
+			<view class="storage-head">
+				<view>
+					<text class="section-label">录音容量</text>
+					<text class="storage-title">云端空间配额</text>
+				</view>
+				<text class="storage-text">{{ storageUsedText }} / {{ storageTotalText }}</text>
 			</view>
 			<view class="progress-bar">
-				<view class="progress" :style="{ width: storage.percentage + '%' }"></view>
+				<view class="progress" :style="{ width: `${storagePercentage}%` }"></view>
 			</view>
+			<text class="storage-caption">容量由云端实时统计，包含当前账号目录下的录音与转码产物占用。</text>
 		</view>
 
 		<view class="menu-list">
-			<view class="menu-item">
-				<text class="menu-item-text">导出全部录音</text>
+			<view class="menu-item" @click="openProfileEditor">
+				<view>
+					<text class="menu-item-text">{{ hasAuthorizedProfile ? '重新填写头像昵称' : '完善微信资料' }}</text>
+					<text class="menu-item-subtext">头像使用微信原生选择器，昵称使用小程序原生昵称输入能力。</text>
+				</view>
 				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
 			</view>
-			<view class="menu-item">
-				<text class="menu-item-text">关于我们</text>
+			<view class="menu-item" @click="showPending('导出全部录音')">
+				<view>
+					<text class="menu-item-text">导出全部录音</text>
+					<text class="menu-item-subtext">后续可在这里汇总并导出个人录音打卡内容。</text>
+				</view>
 				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
 			</view>
-			<view class="menu-item" v-if="user" @click="logout">
-				<text class="menu-item-text logout-text">退出登录</text>
+			<view class="menu-item" @click="showPending('关于我们')">
+				<view>
+					<text class="menu-item-text">关于我们</text>
+					<text class="menu-item-subtext">查看产品说明与版本信息。</text>
+				</view>
+				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
+			</view>
+		</view>
+
+		<view v-if="showEditor" class="profile-editor-mask" @click="closeProfileEditor">
+			<view class="profile-editor" @click.stop>
+				<text class="editor-eyebrow">PROFILE EDITOR</text>
+				<text class="editor-title">完善你的个人资料</text>
+				<text class="editor-desc">微信已不再稳定返回头像昵称，这里改为使用小程序原生资料填写能力。</text>
+
+				<button class="avatar-picker" open-type="chooseAvatar" @chooseavatar="handleChooseAvatar">
+					<image v-if="draftAvatarUrl" class="avatar-picker__image" :src="draftAvatarUrl" mode="aspectFill" />
+					<view v-else class="avatar-picker__placeholder">
+						<i class="iconfont icon-user"></i>
+					</view>
+					<text class="avatar-picker__text">点击选择头像</text>
+				</button>
+
+				<input
+					v-model="draftNickName"
+					class="nickname-input"
+					type="nickname"
+					placeholder="请输入昵称"
+					placeholder-class="nickname-input__placeholder"
+				/>
+
+				<view class="editor-actions">
+					<button class="editor-btn editor-btn--ghost" @click="closeProfileEditor">取消</button>
+					<button class="editor-btn editor-btn--primary" :disabled="authorizing" @click="submitProfile">
+						{{ authorizing ? '保存中...' : '保存资料' }}
+					</button>
+				</view>
 			</view>
 		</view>
 	</view>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import {
+	getUserProfile as fetchUserProfile,
+	upsertUserProfile,
+	type NotebookUserProfile
+} from '@/utils/cloudbase';
 
-const user = ref(null);
-// const user = ref({
-// 	nickName: 'Gemini',
-// 	avatarUrl: 'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png' // Replace with a real avatar
-// });
+const user = ref<NotebookUserProfile | null>(null);
+const loading = ref(false);
+const authorizing = ref(false);
+const showEditor = ref(false);
+const draftAvatarUrl = ref('');
+const draftNickName = ref('');
 
-const storage = ref({
-	used: '256MB',
-	total: '1GB',
-	percentage: 25.6
+const hasAuthorizedProfile = computed(() => {
+	return Boolean(user.value?.nickName && user.value?.avatarUrl);
 });
 
-const goToLogin = () => {
-	uni.navigateTo({
-		url: '/pages/login/login'
-	});
-};
+const storageUsedText = computed(() => formatBytes(user.value?.usedSpace ?? 0));
+const storageTotalText = computed(() => formatBytes(user.value?.totalSpace ?? 0));
+const storagePercentage = computed(() => {
+	const total = user.value?.totalSpace ?? 0;
+	const used = user.value?.usedSpace ?? 0;
 
-const logout = () => {
-	uni.showModal({
-		title: '提示',
-		content: '确定要退出登录吗？',
-		success: (res) => {
-			if (res.confirm) {
-				user.value = null;
-				uni.showToast({ title: '已退出', icon: 'none' });
-			}
+	if (!total) {
+		return 0;
+	}
+
+	return Math.min(100, Number(((used / total) * 100).toFixed(1)));
+});
+
+onShow(() => {
+	loadUserProfile();
+});
+
+async function loadUserProfile() {
+	if (loading.value) {
+		return;
+	}
+
+	loading.value = true;
+
+	try {
+		const result = await fetchUserProfile();
+		if (!result?.success || !result.user) {
+			throw new Error(result?.error || '获取用户资料失败');
 		}
+
+		user.value = result.user;
+	} catch (error) {
+		console.error('加载用户资料失败:', error);
+		uni.showToast({
+			title: '读取资料失败',
+			icon: 'none'
+		});
+	} finally {
+		loading.value = false;
+	}
+}
+
+function openProfileEditor() {
+	draftAvatarUrl.value = user.value?.avatarUrl || '';
+	draftNickName.value = user.value?.nickName || '';
+	showEditor.value = true;
+}
+
+function closeProfileEditor() {
+	if (authorizing.value) {
+		return;
+	}
+
+	showEditor.value = false;
+}
+
+function handleChooseAvatar(event: any) {
+	const avatarUrl = event?.detail?.avatarUrl;
+
+	if (!avatarUrl) {
+		return;
+	}
+
+	draftAvatarUrl.value = avatarUrl;
+}
+
+async function submitProfile() {
+	if (authorizing.value) {
+		return;
+	}
+
+	if (!draftAvatarUrl.value) {
+		uni.showToast({
+			title: '请先选择头像',
+			icon: 'none'
+		});
+		return;
+	}
+
+	if (!draftNickName.value.trim()) {
+		uni.showToast({
+			title: '请先填写昵称',
+			icon: 'none'
+		});
+		return;
+	}
+
+	authorizing.value = true;
+
+	try {
+		const result = await upsertUserProfile({
+			avatarUrl: draftAvatarUrl.value,
+			nickName: draftNickName.value.trim()
+		});
+
+		if (!result?.success || !result.user) {
+			throw new Error(result?.error || '保存用户资料失败');
+		}
+
+		user.value = result.user;
+		showEditor.value = false;
+
+		uni.showToast({
+			title: '资料已保存',
+			icon: 'none'
+		});
+	} catch (error) {
+		console.error('保存用户资料失败:', error);
+		uni.showToast({
+			title: '保存失败，请重试',
+			icon: 'none'
+		});
+	} finally {
+		authorizing.value = false;
+	}
+}
+
+function showPending(label: string) {
+	uni.showToast({
+		title: `${label}功能开发中`,
+		icon: 'none'
 	});
-};
+}
+
+function formatBytes(bytes: number) {
+	if (!bytes) {
+		return '0 B';
+	}
+
+	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+	const value = bytes / 1024 ** exponent;
+	const precision = exponent === 0 ? 0 : value >= 100 ? 0 : value >= 10 ? 1 : 2;
+
+	return `${value.toFixed(precision)} ${units[exponent]}`;
+}
 </script>
 
 <style lang="scss">
+@import "@/styles/notebook-theme.scss";
+
 .profile-container {
-	padding: $uni-spacing-col-lg $uni-spacing-row-lg;
+	min-height: 100vh;
+	padding: 28rpx 28rpx 48rpx;
+	background:
+		linear-gradient(180deg, $vn-bg 0%, $vn-bg-alt 38%, $vn-bg-soft 100%);
+	color: $vn-text;
 }
 
-.user-card-wrapper {
-	margin-bottom: $uni-spacing-col-lg;
+.profile-hero {
+	margin-bottom: 28rpx;
 }
 
 .user-card {
 	display: flex;
+	justify-content: space-between;
+	gap: 24rpx;
+	padding: 34rpx 30rpx;
+	border: 2rpx solid $vn-border;
+	border-radius: 30rpx;
+	background:
+		linear-gradient(135deg, rgba(255, 251, 245, 0.96) 0%, rgba(232, 216, 193, 0.92) 100%);
+	box-shadow: $vn-shadow;
+
+	&--guest {
+		background:
+			linear-gradient(135deg, rgba(255, 248, 238, 0.96) 0%, rgba(226, 212, 195, 0.88) 100%);
+	}
+}
+
+.identity-copy {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.eyebrow {
+	margin-bottom: 14rpx;
+	font-size: 20rpx;
+	letter-spacing: 4rpx;
+	color: $vn-secondary;
+}
+
+.card-title {
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 42rpx;
+	line-height: 1.2;
+	color: $vn-text;
+}
+
+.card-desc {
+	margin-top: 16rpx;
+	font-size: 24rpx;
+	line-height: 1.7;
+	color: $vn-text-muted;
+}
+
+.identity-side {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	justify-content: space-between;
+}
+
+.status-badge {
+	padding: 8rpx 18rpx;
+	border-radius: 999rpx;
+	background: $vn-primary-soft;
+	color: $vn-primary;
+	font-size: 20rpx;
+	letter-spacing: 2rpx;
+
+	&--ready {
+		background: rgba(122, 142, 118, 0.16);
+		color: #56684f;
+	}
+}
+
+.avatar,
+.avatar-placeholder {
+	width: 116rpx;
+	height: 116rpx;
+	border-radius: 28rpx;
+}
+
+.avatar {
+	border: 2rpx solid $vn-border;
+}
+
+.avatar-placeholder {
+	display: flex;
 	align-items: center;
-	padding: $uni-spacing-col-lg;
-	background-color: $uni-bg-color;
-	border-radius: $uni-border-radius-base;
+	justify-content: center;
+	background: rgba(31, 26, 23, 0.08);
+	color: $vn-primary;
 
-	.avatar {
-		width: 64px;
-		height: 64px;
-		border-radius: 50%;
-		margin-right: $uni-spacing-row-base;
+	.iconfont {
+		font-size: 66rpx;
 	}
+}
 
-	.nickname {
-		font-size: $ds-font-size-h2;
-		font-weight: 600;
-		color: $uni-text-color;
-	}
+.hero-note {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 18rpx;
+	padding: 0 10rpx;
+}
 
-	&.not-logged-in {
-		.avatar-placeholder {
-			width: 64px;
-			height: 64px;
-			border-radius: 50%;
-			background-color: $uni-bg-color-grey;
-			margin-right: $uni-spacing-row-base;
-		}
-		.login-prompt {
-			font-size: $ds-font-size-h2;
-			font-weight: 600;
-			color: $uni-text-color-grey;
-		}
-	}
+.hero-note__label,
+.hero-note__value {
+	font-size: 22rpx;
+	color: $vn-text-muted;
+}
+
+.storage-card,
+.menu-list {
+	border-radius: 28rpx;
+	border: 2rpx solid $vn-border;
+	background: $vn-surface;
+	box-shadow: $vn-shadow;
 }
 
 .storage-card {
-	padding: $uni-spacing-col-base $uni-spacing-row-lg;
-	background-color: $uni-bg-color;
-	border-radius: $uni-border-radius-base;
-	margin-bottom: $uni-spacing-col-lg;
+	margin-bottom: 28rpx;
+	padding: 28rpx;
+}
 
-	.storage-info {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: $uni-spacing-col-sm;
-	}
+.storage-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 20rpx;
+	align-items: flex-start;
+	margin-bottom: 20rpx;
+}
 
-	.storage-title {
-		font-size: $uni-font-size-base;
-		color: $uni-text-color;
-	}
+.section-label {
+	display: block;
+	margin-bottom: 10rpx;
+	font-size: 20rpx;
+	letter-spacing: 3rpx;
+	color: $vn-secondary;
+}
 
-	.storage-text {
-		font-size: $uni-font-size-sm;
-		color: $uni-text-color-grey;
-	}
+.storage-title {
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 34rpx;
+	color: $vn-text;
+}
 
-	.progress-bar {
-		width: 100%;
-		height: 8px;
-		background-color: $uni-bg-color-grey;
-		border-radius: 4px;
-		overflow: hidden;
+.storage-text {
+	font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', monospace;
+	font-size: 24rpx;
+	color: $vn-text;
+}
 
-		.progress {
-			height: 100%;
-			background-color: $uni-color-primary;
-			border-radius: 4px;
-		}
-	}
+.progress-bar {
+	width: 100%;
+	height: 16rpx;
+	border-radius: 999rpx;
+	background: rgba(31, 26, 23, 0.08);
+	overflow: hidden;
+}
+
+.progress {
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, $vn-primary 0%, $vn-secondary 100%);
+}
+
+.storage-caption {
+	display: block;
+	margin-top: 16rpx;
+	font-size: 22rpx;
+	line-height: 1.6;
+	color: $vn-text-muted;
 }
 
 .menu-list {
-	background-color: $uni-bg-color;
-	border-radius: $uni-border-radius-base;
 	overflow: hidden;
+}
 
-	.menu-item {
-		display: flex;
-		align-items: center;
-		padding: $uni-spacing-col-base $uni-spacing-row-lg;
-		border-bottom: 1px solid $uni-border-color;
-        transition: background-color 0.2s;
+.menu-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20rpx;
+	padding: 28rpx;
+	border-bottom: 2rpx solid $vn-border;
 
-		&:last-child {
-			border-bottom: none;
-		}
-        
-        &:active {
-            background-color: $uni-bg-color-hover;
-        }
-
-		.menu-item-text {
-			flex: 1;
-			font-size: $uni-font-size-lg;
-			color: $uni-text-color;
-		}
-
-		.logout-text {
-			color: $uni-color-primary;
-			text-align: center;
-		}
-
-		.menu-item-arrow {
-			width: 20px;
-			height: 20px;
-		}
+	&:last-child {
+		border-bottom: none;
 	}
+
+	&:active {
+		background: rgba(216, 199, 176, 0.24);
+	}
+}
+
+.menu-item-text {
+	display: block;
+	font-size: 30rpx;
+	color: $vn-text;
+}
+
+.menu-item-subtext {
+	display: block;
+	margin-top: 8rpx;
+	font-size: 22rpx;
+	line-height: 1.6;
+	color: $vn-text-muted;
+}
+
+.menu-item-arrow {
+	flex-shrink: 0;
+	width: 28rpx;
+	height: 28rpx;
+	opacity: 0.7;
+}
+
+.profile-editor-mask {
+	position: fixed;
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	align-items: flex-end;
+	background: rgba(31, 26, 23, 0.42);
+}
+
+.profile-editor {
+	width: 100%;
+	padding: 34rpx 28rpx calc(40rpx + env(safe-area-inset-bottom));
+	border-radius: 32rpx 32rpx 0 0;
+	background: $vn-bg-soft;
+	box-shadow: 0 -16rpx 48rpx rgba(31, 26, 23, 0.12);
+}
+
+.editor-eyebrow {
+	display: block;
+	margin-bottom: 12rpx;
+	font-size: 20rpx;
+	letter-spacing: 4rpx;
+	color: $vn-secondary;
+}
+
+.editor-title {
+	display: block;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 40rpx;
+	color: $vn-text;
+}
+
+.editor-desc {
+	display: block;
+	margin-top: 14rpx;
+	font-size: 24rpx;
+	line-height: 1.7;
+	color: $vn-text-muted;
+}
+
+.avatar-picker {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16rpx;
+	margin-top: 28rpx;
+	padding: 28rpx 24rpx;
+	border: 2rpx dashed rgba(196, 106, 45, 0.38);
+	border-radius: 28rpx;
+	background: rgba(244, 239, 230, 0.72);
+}
+
+.avatar-picker::after,
+.editor-btn::after {
+	border: none;
+}
+
+.avatar-picker__image,
+.avatar-picker__placeholder {
+	width: 132rpx;
+	height: 132rpx;
+	border-radius: 32rpx;
+}
+
+.avatar-picker__placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(31, 26, 23, 0.08);
+	color: $vn-primary;
+
+	.iconfont {
+		font-size: 72rpx;
+	}
+}
+
+.avatar-picker__text {
+	font-size: 24rpx;
+	color: $vn-text;
+}
+
+.nickname-input {
+	height: 96rpx;
+	margin-top: 24rpx;
+	padding: 0 24rpx;
+	border: 2rpx solid rgba(31, 26, 23, 0.1);
+	border-radius: 24rpx;
+	background: $vn-surface-strong;
+	font-size: 28rpx;
+	color: $vn-text;
+}
+
+.nickname-input__placeholder {
+	color: $vn-text-soft;
+}
+
+.editor-actions {
+	display: flex;
+	gap: 18rpx;
+	margin-top: 28rpx;
+}
+
+.editor-btn {
+	flex: 1;
+	height: 92rpx;
+	border-radius: 24rpx;
+	font-size: 28rpx;
+}
+
+.editor-btn--ghost {
+	background: rgba(31, 26, 23, 0.06);
+	color: $vn-text;
+}
+
+.editor-btn--primary {
+	background: $vn-primary;
+	color: $vn-bg-soft;
+}
+
+.editor-btn--primary[disabled] {
+	opacity: 0.6;
 }
 </style>

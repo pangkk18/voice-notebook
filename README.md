@@ -30,8 +30,76 @@
 ## 开发说明
 
 - CloudBase 初始化集中在 `src/utils/cloudbase.ts`
-- 当前环境配置同时存在于 `src/utils/cloudbase.ts` 和 `cloudbaserc.json`
+- 前端环境配置通过 `.env.local` 读取，CloudBase Framework 配置通过 `cloudbaserc.template.json` 生成本地 `cloudbaserc.json`
 - 项目保留了原始 CloudBase demo 的工具链、规则文件和约束，但后续文档、提示词、Agent 描述应统一使用“录音打卡小程序”语义，而不是泛化 demo / AI 项目语义
+
+## 开源使用前需替换的配置
+
+为了便于其他开发者直接复用，本仓库文档与公开配置文件统一使用占位符环境 ID：
+
+- CloudBase 环境 ID：`<your-cloudbase-env-id>`
+
+克隆项目后，推荐先复制环境变量模板：
+
+```bash
+cp .env.example .env.local
+```
+
+然后至少需要检查并替换以下位置：
+
+- `.env.local`
+- `cloudbaserc.template.json`（通常无需直接改）
+
+如果你要接入自己的 CloudBase 环境，请将上述占位符改成你自己的环境 ID。
+
+当前前端默认从 `import.meta.env.VITE_CLOUDBASE_ENV_ID` 读取环境 ID，因此开源使用时优先修改 `.env.local`；通常不需要再改 `src/utils/cloudbase.ts`。
+
+修改完 `.env.local` 后，再执行：
+
+```bash
+npm run generate:cloudbaserc
+```
+
+这会基于 `cloudbaserc.template.json` 生成本地使用的 `cloudbaserc.json`。该文件已加入 `.gitignore`，不会进入版本管理。
+
+## 个人页云端配额统计配置
+
+个人信息页中的“云端空间配额”由云函数 `getUserProfile` 实时统计，统计口径为当前用户目录下的录音与转码产物总占用。该能力依赖云函数环境变量。
+
+### 需要配置的环境变量
+
+在 CloudBase 控制台中进入云函数 `getUserProfile`，添加以下环境变量：
+
+- `CLOUDBASE_SECRETID`：腾讯云 API 密钥中的 `SecretId`
+- `CLOUDBASE_SECRETKEY`：腾讯云 API 密钥中的 `SecretKey`
+- `CLOUDBASE_ENV_ID`：CloudBase 环境 ID，例如 `<your-cloudbase-env-id>`
+
+### 获取 SecretId / SecretKey
+
+1. 打开腾讯云 API 密钥控制台：<https://console.cloud.tencent.com/cam/capi>
+2. 在“API 密钥管理”中查看或新建一对密钥
+3. 复制得到：
+   - `SecretId`
+   - `SecretKey`
+
+建议为本项目单独创建一对密钥，不要复用其他生产系统正在使用的密钥。
+
+### 在 CloudBase 控制台中设置环境变量
+
+1. 打开 CloudBase 控制台云函数页：`https://tcb.cloud.tencent.com/dev?envId=<your-cloudbase-env-id>#/scf`
+2. 进入函数 `getUserProfile`
+3. 打开“函数配置”或“环境变量”
+4. 新增并保存：
+   - `CLOUDBASE_SECRETID`
+   - `CLOUDBASE_SECRETKEY`
+   - `CLOUDBASE_ENV_ID`
+5. 重新部署 `getUserProfile` 云函数代码
+
+### 安全说明
+
+- 这些密钥只能配置在云函数环境变量中，不能放到前端代码里
+- 如果密钥曾在聊天记录、截图或公开仓库中暴露，请立即删除并重建
+- 推荐在验证完成后定期轮换密钥
 
 ## 常用命令
 

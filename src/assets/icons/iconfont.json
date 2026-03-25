@@ -6,11 +6,39 @@
   "description": "",
   "glyphs": [
     {
-      "icon_id": "32731475",
-      "name": "删除",
-      "font_class": "shanchu",
-      "unicode": "e74a",
-      "unicode_decimal": 59210
+      "icon_id": "12140666",
+      "name": "My2",
+      "font_class": "user",
+      "unicode": "e782",
+      "unicode_decimal": 59266
+    },
+    {
+      "icon_id": "8106219",
+      "name": "edit",
+      "font_class": "edit1",
+      "unicode": "e69a",
+      "unicode_decimal": 59034
+    },
+    {
+      "icon_id": "8106217",
+      "name": "delete",
+      "font_class": "delete",
+      "unicode": "e699",
+      "unicode_decimal": 59033
+    },
+    {
+      "icon_id": "12865685",
+      "name": "share",
+      "font_class": "share",
+      "unicode": "e6ee",
+      "unicode_decimal": 59118
+    },
+    {
+      "icon_id": "17427356",
+      "name": "edit",
+      "font_class": "edit",
+      "unicode": "e61d",
+      "unicode_decimal": 58909
     },
     {
       "icon_id": "46861881",

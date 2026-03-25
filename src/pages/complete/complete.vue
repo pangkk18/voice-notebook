@@ -14,6 +14,8 @@ const goBack = () => {
 </script>
 
 <style lang="scss">
+@import "@/styles/notebook-theme.scss";
+
 .placeholder-container {
   display: flex;
   flex-direction: column;
@@ -21,10 +23,26 @@ const goBack = () => {
   justify-content: center;
   height: 100vh;
   padding: 20px;
+  background:
+    linear-gradient(180deg, $vn-bg 0%, $vn-bg-alt 42%, $vn-bg-soft 100%);
 }
 .placeholder-text {
   font-size: 24px;
-  color: $uni-text-color;
+  color: $vn-text;
   margin-bottom: 20px;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.placeholder-container button {
+  min-width: 180rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  background: $vn-primary;
+  color: $vn-bg-soft;
+  box-shadow: $vn-shadow;
+}
+
+.placeholder-container button::after {
+  border: none;
 }
 </style>

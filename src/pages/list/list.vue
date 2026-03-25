@@ -162,8 +162,12 @@ onShow(() => {
 </script>
 
 <style lang="scss">
+@import "@/styles/notebook-theme.scss";
+
 .list-container {
 	height: 100%;
+	background:
+		linear-gradient(180deg, $vn-bg 0%, $vn-bg-alt 38%, $vn-bg-soft 100%);
 }
 
 .scroll-view {
@@ -179,12 +183,14 @@ onShow(() => {
 .date-header-text {
 	font-size: $ds-font-size-h2;
 	font-weight: 600;
-	color: $uni-text-color;
+	color: $vn-text;
 }
 
 .recording-list {
-	background-color: $uni-bg-color;
-	border-radius: $uni-border-radius-base;
+	background-color: $vn-surface;
+	border-radius: 24rpx;
+	border: 1px solid $vn-border;
+	box-shadow: $vn-shadow;
 	overflow: hidden;
 }
 
@@ -193,27 +199,28 @@ onShow(() => {
 	justify-content: space-between;
 	align-items: center;
 	padding: $uni-spacing-col-base $uni-spacing-row-base;
-	border-bottom: 1px solid $uni-border-color;
+	border-bottom: 1px solid $vn-border;
 	transition: background-color 0.2s;
 
 	&:last-child {
 		border-bottom: none;
 	}
     
-    &:active {
-        background-color: $uni-bg-color-hover;
-    }
+	&:active {
+		background-color: rgba(216, 199, 176, 0.2);
+	}
 	.label{
 		width: 44px;
 		height: 44px;
 		border-radius: 50%;
-		background-color: $notebook-light-color;
+		background-color: $vn-primary-soft;
+		border: 1px solid $vn-border-strong;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		.iconfont {
 			font-size: 24px;
-			color: $notebook-primary-color;
+			color: $vn-primary;
 		}
 	}
 	.item-info {
@@ -226,25 +233,26 @@ onShow(() => {
 
 	.item-title {
 		font-size: 14px;
-		color: #000000;
+		color: $vn-text;
 		font-weight: 500;
 		margin-bottom: $uni-spacing-col-sm;
 	}
 
 	.item-meta {
 		font-size: 12px;
-		color: #999999;
+		color: $vn-text-muted;
 	}
 
 	.item-play-button {
 		width: 44px;
 		height: 44px;
 		border-radius: 50%;
-		background-color: $notebook-primary-color;
+		background-color: $vn-primary;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		margin-left: $uni-spacing-row-base;
+		box-shadow: 0 10rpx 24rpx $vn-primary-glow;
 		.play-icon {
 			font-size: 24px;
 			color: #ffffff;
@@ -268,7 +276,7 @@ onShow(() => {
 
 	.empty-text {
 		font-size: $uni-font-size-base;
-		color: $uni-text-color-grey;
+		color: $vn-text-muted;
 	}
 }
 
@@ -276,8 +284,9 @@ onShow(() => {
 	padding-top: $uni-spacing-col-lg;
 	.skeleton-item {
 		height: 80px;
-		background-color: $uni-bg-color;
-		border-radius: $uni-border-radius-base;
+		background-color: $vn-surface;
+		border: 1px solid $vn-border;
+		border-radius: 24rpx;
 		margin-bottom: $uni-spacing-col-base;
 		opacity: 0.5;
 	}

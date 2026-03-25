@@ -495,12 +495,14 @@ onUnload(() => {
 </script>
 
 <style lang="scss" scoped>
+@import "@/styles/notebook-theme.scss";
+
 .player-page {
   position: relative;
   min-height: 100vh;
   padding: 28rpx 34rpx 160rpx;
-  background: linear-gradient(160deg, #f8f3ee 0%, #f4f6f9 45%, #ffffff 100%);
-  color: #1d1c1a;
+  background: linear-gradient(160deg, $vn-bg 0%, $vn-bg-alt 42%, $vn-bg-soft 100%);
+  color: $vn-text;
   font-family: 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   overflow: hidden;
 }
@@ -512,7 +514,7 @@ onUnload(() => {
   left: -80rpx;
   width: 420rpx;
   height: 420rpx;
-  background: radial-gradient(circle, rgba(233, 75, 75, 0.12) 0%, rgba(233, 75, 75, 0) 60%);
+  background: radial-gradient(circle, rgba(196, 106, 45, 0.16) 0%, rgba(196, 106, 45, 0) 60%);
   z-index: 0;
 }
 
@@ -536,7 +538,7 @@ onUnload(() => {
 
 .subtitle {
   font-size: 24rpx;
-  color: #8a8f98;
+  color: $vn-text-muted;
 }
 
 .waveform {
@@ -559,11 +561,11 @@ onUnload(() => {
 }
 
 .bar-idle {
-  background: #cfd5df;
+  background: rgba(122, 142, 118, 0.22);
 }
 
 .bar-active {
-  background: #e94b4b;
+  background: $vn-primary;
 }
 
 .time {
@@ -589,7 +591,7 @@ onUnload(() => {
 
 .time-sm {
   font-size: 22rpx;
-  color: #9aa0aa;
+  color: $vn-text-muted;
 }
 
 .slider {
@@ -616,29 +618,30 @@ onUnload(() => {
   width: 80rpx;
   height: 80rpx;
   border-radius: 24rpx;
-  background: #f1f2f6;
+  background: $vn-surface;
+  border: 1rpx solid $vn-border;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 14rpx 30rpx rgba(27, 27, 27, 0.08);
+  box-shadow: $vn-shadow;
 }
 
 .pill.danger {
-  background: rgba(233, 75, 75, 0.12);
+  background: $vn-danger-soft;
 }
 
 .icon-sm {
   font-size: 30rpx;
-  color: #6d717a;
+  color: $vn-text-muted;
 }
 
 .action-text {
   font-size: 22rpx;
-  color: #6d717a;
+  color: $vn-text-muted;
 }
 
 .danger-text {
-  color: #e94b4b;
+  color: $vn-danger;
 }
 
 .transport {
@@ -654,16 +657,16 @@ onUnload(() => {
   width: 90rpx;
   height: 90rpx;
   border-radius: 45rpx;
-  background: #f6f7fb;
+  background: $vn-surface;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1rpx solid #e1e4ec;
+  border: 1rpx solid $vn-border;
 }
 
 .chip-text {
   font-size: 20rpx;
-  color: #7d828b;
+  color: $vn-text-muted;
   letter-spacing: 2rpx;
 }
 
@@ -671,11 +674,11 @@ onUnload(() => {
   width: 140rpx;
   height: 140rpx;
   border-radius: 70rpx;
-  background: #e94b4b;
+  background: $vn-primary;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 24rpx 48rpx rgba(233, 75, 75, 0.35);
+  box-shadow: 0 24rpx 48rpx $vn-primary-glow;
 }
 
 .play-icon {
@@ -689,6 +692,6 @@ onUnload(() => {
   left: 0;
   right: 0;
   height: 120rpx;
-  background: linear-gradient(0deg, #ffffff 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(0deg, $vn-bg-soft 0%, rgba(255, 249, 241, 0) 100%);
 }
 </style>
