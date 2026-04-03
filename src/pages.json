@@ -39,7 +39,9 @@
 		{
 			"path": "pages/player/player",
 			"style": {
-				"navigationBarTitleText": "播放"
+				"navigationBarTitleText": "播放",
+				"enableShareAppMessage": true,
+				"enableShareTimeline": true
 			}
 		},
 		{

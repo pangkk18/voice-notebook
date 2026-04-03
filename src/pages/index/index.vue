@@ -204,7 +204,7 @@ function formatFileTime(date) {
 	return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
-function openPlayerPage(meta, filePath, tempFilePath, cloudFileID, cloudMp3FileID) {
+function openPlayerPage(meta, filePath, tempFilePath, cloudFileID, previewM4aFileID = '', fullM4aFileID = '') {
 	if (!meta) return
 	const params = [
 		`title=${encodeURIComponent(meta.title)}`,
@@ -213,7 +213,8 @@ function openPlayerPage(meta, filePath, tempFilePath, cloudFileID, cloudMp3FileI
 		`localFilePath=${encodeURIComponent(filePath || '')}`,
 		`tempFilePath=${encodeURIComponent(tempFilePath || '')}`,
 		`cloudFileID=${encodeURIComponent(cloudFileID || '')}`,
-		`cloudMp3FileID=${encodeURIComponent(cloudMp3FileID || '')}`
+		`previewM4aFileID=${encodeURIComponent(previewM4aFileID || '')}`,
+		`fullM4aFileID=${encodeURIComponent(fullM4aFileID || '')}`
 	].join('&')
 	uni.navigateTo({
 		url: `/pages/player/player?${params}`
@@ -386,10 +387,6 @@ onMounted(() => {
 						console.log('Uploaded:', uploadRes)
 						updateNotebookUploadInfo(recordId, uploadRes.fileID, uploadRes.cloudPath).then(() => {
 							console.log('Notebook upload fields updated:', recordId)
-							uni.showToast({
-								title: '录音已上传',
-								icon: 'success'
-							})
 						}).catch((err) => {
 							console.error('Update notebook upload info failed:', err)
 							uni.showToast({

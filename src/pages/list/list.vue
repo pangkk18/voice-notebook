@@ -75,8 +75,8 @@ const goToDetail = (item) => {
 		`localFilePath=${encodeURIComponent(item.tempPath || '')}`,
 		`tempFilePath=${encodeURIComponent(item.tempPath || '')}`,
 		`cloudFileID=${encodeURIComponent(item.cloudFileID || '')}`,
-		`cloudMp3FileID=${encodeURIComponent(item.cloudMp3FileID || '')}`,
-		`cloudM3u8FileID=${encodeURIComponent(item.cloudM3u8FileID || '')}`,
+		`previewM4aFileID=${encodeURIComponent(item.previewM4aFileID || '')}`,
+		`fullM4aFileID=${encodeURIComponent(item.fullM4aFileID || '')}`,
 		`conversionStatus=${encodeURIComponent(item.conversionStatus || '')}`
 	].join('&');
 	uni.navigateTo({
@@ -137,8 +137,8 @@ const loadRecordings = async () => {
 				createdAt: formatTimeForItem(createdAt),
 				tempPath: item.temp_path || '',
 				cloudFileID: item.fileID || '',
-				cloudMp3FileID: item.mp3FileID || '',
-				cloudM3u8FileID: item.m3u8FileID || '',
+				previewM4aFileID: item.previewM4aFileID || '',
+				fullM4aFileID: item.fullM4aFileID || '',
 				conversionStatus: item.conversion_status || '',
 				cloudPath: item.cloudPath || ''
 			};
@@ -165,15 +165,16 @@ onShow(() => {
 @import "@/styles/notebook-theme.scss";
 
 .list-container {
-	height: 100%;
-	background:
-		linear-gradient(180deg, $vn-bg 0%, $vn-bg-alt 38%, $vn-bg-soft 100%);
+	min-height: 100vh;
+	background: $vn-bg;
 }
 
 .scroll-view {
-	height: 100%;
+	min-height: 100vh;
+	height: 100vh;
 	padding: 0 $uni-spacing-row-lg;
 	box-sizing: border-box;
+	background: $vn-bg;
 }
 
 .date-header {
@@ -266,7 +267,9 @@ onShow(() => {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding-top: 20vh;
+	min-height: 100vh;
+	padding: 0 40rpx 140rpx;
+	box-sizing: border-box;
 
 	.empty-icon {
 		width: 100px;
@@ -281,7 +284,10 @@ onShow(() => {
 }
 
 .skeleton-wrapper {
-	padding-top: $uni-spacing-col-lg;
+	min-height: 100vh;
+	padding: $uni-spacing-col-lg 0 140rpx;
+	box-sizing: border-box;
+
 	.skeleton-item {
 		height: 80px;
 		background-color: $vn-surface;

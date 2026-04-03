@@ -9,9 +9,17 @@ cloud.init({
 const db = cloud.database();
 
 const TEMP_DIR = '/tmp';
+const PREVIEW_CODEC = {
+  sampleRate: 24000,
+  bitrate: '40k'
+};
+const FULL_CODEC = {
+  sampleRate: 44100,
+  bitrate: '80k'
+};
 
 /**
- * WAV 转 MP3 云函数
+ * WAV 转 M4A 预览/正式播放资源
  * @param {string} fileID - 云存储文件 ID
  * @param {string} cloudPath - 云存储路径
  * @param {string} recordId - 录音记录 ID
@@ -54,7 +62,8 @@ exports.main = async (event) => {
     });
 
     const tempWavPath = path.join(TEMP_DIR, `${recordId}.wav`);
-    const tempMp3Path = path.join(TEMP_DIR, `${recordId}.mp3`);
+    const tempPreviewPath = path.join(TEMP_DIR, `${recordId}_preview.m4a`);
+    const tempFullPath = path.join(TEMP_DIR, `${recordId}_full.m4a`);
 
     // 将文件保存到临时目录
     const { fileContent } = downloadResult;
@@ -65,43 +74,44 @@ exports.main = async (event) => {
     const audioInfo = await getAudioInfo(tempWavPath, ffprobePath);
     console.log('Audio info:', audioInfo);
 
-    // 3. 转换为 MP3
-    await convertToMp3(tempWavPath, tempMp3Path, ffmpegPath);
-    console.log('Conversion completed:', tempMp3Path);
-
-    // 3.1 转换为 HLS (m3u8 + ts)
-    const hlsDir = path.join(TEMP_DIR, `${recordId}_hls`);
-    ensureDir(hlsDir);
-    const hlsIndexPath = path.join(hlsDir, 'index.m3u8');
-    await convertToHls(tempWavPath, hlsIndexPath, ffmpegPath);
-    console.log('HLS conversion completed:', hlsIndexPath);
-
-    // 4. 上传 MP3 文件
-    const mp3FileName = path.basename(cloudPath, '.wav') + '.mp3';
-    const mp3CloudPath = `${ownerOpenId}/mp3/${mp3FileName}`;
-
-    const uploadResult = await cloud.uploadFile({
-      cloudPath: mp3CloudPath,
-      fileContent: fs.readFileSync(tempMp3Path)
+    // 3. 生成 preview/full m4a
+    await convertToM4a(tempWavPath, tempPreviewPath, ffmpegPath, PREVIEW_CODEC);
+    await convertToM4a(tempWavPath, tempFullPath, ffmpegPath, FULL_CODEC);
+    console.log('M4A conversion completed:', {
+      tempPreviewPath,
+      tempFullPath
     });
 
-    const mp3FileID = uploadResult.fileID;
-    console.log('MP3 uploaded:', { mp3CloudPath, mp3FileID });
+    // 4. 上传 preview/full m4a
+    const baseName = path.basename(cloudPath, '.wav');
+    const previewM4aCloudPath = `${ownerOpenId}/preview/${baseName}.m4a`;
+    const fullM4aCloudPath = `${ownerOpenId}/full/${baseName}.m4a`;
 
-    // 4.1 上传 HLS 文件
-    const hlsFolderName = path.basename(cloudPath, '.wav');
-    const hlsCloudDir = `${ownerOpenId}/hls/${hlsFolderName}`;
-    const hlsUploadResult = await uploadHlsDirectory(hlsDir, hlsCloudDir);
-    console.log('HLS uploaded:', hlsUploadResult);
+    const previewUploadResult = await cloud.uploadFile({
+      cloudPath: previewM4aCloudPath,
+      fileContent: fs.readFileSync(tempPreviewPath)
+    });
+    const fullUploadResult = await cloud.uploadFile({
+      cloudPath: fullM4aCloudPath,
+      fileContent: fs.readFileSync(tempFullPath)
+    });
+
+    const previewM4aFileID = previewUploadResult.fileID;
+    const fullM4aFileID = fullUploadResult.fileID;
+    console.log('M4A uploaded:', {
+      previewM4aCloudPath,
+      fullM4aCloudPath,
+      previewM4aFileID,
+      fullM4aFileID
+    });
 
     // 5. 更新数据库记录
     await db.collection('notebook').doc(recordId).update({
       data: {
-        mp3FileID,
-        mp3CloudPath,
-        m3u8FileID: hlsUploadResult.m3u8FileID,
-        m3u8CloudPath: hlsUploadResult.m3u8CloudPath,
-        hlsSegmentCloudPaths: hlsUploadResult.segmentCloudPaths,
+        previewM4aFileID,
+        previewM4aCloudPath,
+        fullM4aFileID,
+        fullM4aCloudPath,
         conversion_status: 'completed',
         conversion_error: '',
         conversion_time: db.serverDate(),
@@ -113,8 +123,8 @@ exports.main = async (event) => {
     // 6. 清理临时文件
     try {
       fs.unlinkSync(tempWavPath);
-      fs.unlinkSync(tempMp3Path);
-      cleanupDir(path.join(TEMP_DIR, `${recordId}_hls`));
+      fs.unlinkSync(tempPreviewPath);
+      fs.unlinkSync(tempFullPath);
       console.log('Temp files cleaned');
     } catch (err) {
       console.warn('Failed to clean temp files:', err);
@@ -122,11 +132,10 @@ exports.main = async (event) => {
 
     return {
       success: true,
-      mp3FileID,
-      mp3CloudPath,
-      m3u8FileID: hlsUploadResult.m3u8FileID,
-      m3u8CloudPath: hlsUploadResult.m3u8CloudPath,
-      hlsSegmentCloudPaths: hlsUploadResult.segmentCloudPaths,
+      previewM4aFileID,
+      previewM4aCloudPath,
+      fullM4aFileID,
+      fullM4aCloudPath,
       audioInfo
     };
 
@@ -194,95 +203,26 @@ function extractOpenIdFromCloudPath(cloudPath) {
 }
 
 /**
- * 使用 ffmpeg 转换为 MP3
+ * 使用 ffmpeg 转换为 M4A，支持 preview/full 两套配置
  */
-async function convertToMp3(inputPath, outputPath, ffmpegPath) {
+async function convertToM4a(inputPath, outputPath, ffmpegPath, codec) {
   return new Promise((resolve, reject) => {
     const { exec } = require('child_process');
+    const cmd = `"${ffmpegPath}" -i "${inputPath}" -c:a aac -b:a ${codec.bitrate} -ar ${codec.sampleRate} -ac 1 -movflags +faststart -y "${outputPath}"`;
 
-    // ffmpeg 命令参数说明:
-    // -i: 输入文件
-    // -codec:a libmp3lame: 使用 mp3 编码器
-    // -b:a 128k: 音频比特率 128kbps (质量较好的平衡值)
-    // -ar 44100: 采样率 44.1kHz (MP3 标准)
-    // -ac 2: 双声道
-    // -y: 覆盖输出文件
-    const cmd = `"${ffmpegPath}" -i "${inputPath}" -codec:a libmp3lame -b:a 128k -ar 44100 -ac 2 -y "${outputPath}"`;
-
-    console.log('Executing ffmpeg command...');
+    console.log('Executing ffmpeg m4a command...', { outputPath, codec });
 
     exec(cmd, {
       maxBuffer: 50 * 1024 * 1024 // 50MB buffer
     }, (error, stdout, stderr) => {
       if (error) {
         console.error('FFmpeg error:', stderr);
-        reject(new Error(`FFmpeg conversion failed: ${stderr}`));
-        return;
-      }
-
-      console.log('FFmpeg output:', stderr); // ffmpeg 输出到 stderr
-      resolve();
-    });
-  });
-}
-
-async function convertToHls(inputPath, hlsIndexPath, ffmpegPath) {
-  return new Promise((resolve, reject) => {
-    const { exec } = require('child_process');
-    const segmentPattern = path.join(path.dirname(hlsIndexPath), 'segment_%03d.ts');
-    const cmd = `"${ffmpegPath}" -i "${inputPath}" -c:a aac -b:a 128k -ar 44100 -ac 2 -f hls -hls_time 6 -hls_list_size 0 -hls_segment_filename "${segmentPattern}" -y "${hlsIndexPath}"`;
-
-    console.log('Executing HLS ffmpeg command...');
-    exec(cmd, {
-      maxBuffer: 50 * 1024 * 1024
-    }, (error, stdout, stderr) => {
-      if (error) {
-        console.error('HLS FFmpeg error:', stderr);
-        reject(new Error(`HLS conversion failed: ${stderr}`));
+        reject(new Error(`FFmpeg m4a conversion failed: ${stderr}`));
         return;
       }
       resolve();
     });
   });
-}
-
-async function uploadHlsDirectory(localDir, cloudDir) {
-  const files = fs.readdirSync(localDir).filter((name) => name.endsWith('.m3u8') || name.endsWith('.ts'));
-  files.sort();
-
-  if (!files.length) {
-    throw new Error(`No HLS files found in ${localDir}`);
-  }
-
-  let m3u8FileID = '';
-  let m3u8CloudPath = '';
-  const segmentCloudPaths = [];
-
-  for (const name of files) {
-    const localPath = path.join(localDir, name);
-    const cloudPath = `${cloudDir}/${name}`;
-    const uploaded = await cloud.uploadFile({
-      cloudPath,
-      fileContent: fs.readFileSync(localPath)
-    });
-
-    if (name.endsWith('.m3u8')) {
-      m3u8FileID = uploaded.fileID;
-      m3u8CloudPath = cloudPath;
-    } else if (name.endsWith('.ts')) {
-      segmentCloudPaths.push(cloudPath);
-    }
-  }
-
-  if (!m3u8FileID) {
-    throw new Error('HLS upload completed but m3u8 file missing');
-  }
-
-  return {
-    m3u8FileID,
-    m3u8CloudPath,
-    segmentCloudPaths
-  };
 }
 
 function resolveBinaryPath(envPath, candidates, binaryName) {
@@ -313,12 +253,6 @@ function resolveBinaryPath(envPath, candidates, binaryName) {
     // continue
   }
   throw new Error(`Binary not found. Tried: ${all.join(', ')}`);
-}
-
-function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
 }
 
 function cleanupDir(dirPath) {

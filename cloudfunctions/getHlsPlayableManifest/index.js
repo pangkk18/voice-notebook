@@ -94,10 +94,29 @@ exports.main = async (event) => {
 
     const signedManifest = rewriteManifest(manifestText, mapByName);
 
+    const signedManifestCloudPath = `${OPENID}/hls_playable/${recordId}.m3u8`;
+    const uploadedManifest = await cloud.uploadFile({
+      cloudPath: signedManifestCloudPath,
+      fileContent: Buffer.from(signedManifest, 'utf8')
+    });
+
+    const playableManifestResult = await cloud.getTempFileURL({
+      fileList: [{ fileID: uploadedManifest.fileID, maxAge: Number(maxAge) || 3600 }]
+    });
+    const playableUrl = playableManifestResult?.fileList?.[0]?.tempFileURL || '';
+
+    if (!playableUrl) {
+      return {
+        success: false,
+        error: 'failed to create playable manifest url'
+      };
+    }
+
     return {
       success: true,
       recordId,
       signedManifest,
+      playableUrl,
       expiresIn: Number(maxAge) || 3600
     };
   } catch (error) {
@@ -126,9 +145,11 @@ function buildSegmentFileIDs({ segmentFileIDs, segmentCloudPaths, m3u8FileID, m3
   if (segmentFileIDs.length) return segmentFileIDs;
   if (!segmentCloudPaths.length || !m3u8FileID || !m3u8CloudPath) return [];
 
-  const idx = m3u8FileID.indexOf(m3u8CloudPath);
-  if (idx < 0) return [];
-  const prefix = m3u8FileID.slice(0, idx);
+  const manifestCloudPathFromFileID = parseCloudPathFromFileID(m3u8FileID);
+  if (!manifestCloudPathFromFileID) return [];
+
+  const prefix = m3u8FileID.slice(0, m3u8FileID.length - manifestCloudPathFromFileID.length);
+  if (!prefix) return [];
   return segmentCloudPaths.map((cloudPath) => `${prefix}${cloudPath}`);
 }
 

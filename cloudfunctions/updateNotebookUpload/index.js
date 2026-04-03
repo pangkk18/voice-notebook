@@ -29,11 +29,17 @@ exports.main = async (event) => {
       data: {
         fileID,
         cloudPath,
-        upload_time: db.serverDate()
+        upload_time: db.serverDate(),
+        conversion_status: 'processing',
+        conversion_error: '',
+        previewM4aFileID: '',
+        previewM4aCloudPath: '',
+        fullM4aFileID: '',
+        fullM4aCloudPath: ''
       }
     });
 
-    // 异步触发 MP3 转换（不等待转换完成）
+    // 异步触发音频预处理（不等待转换完成）
     cloud.callFunction({
       name: 'convertAudioToMp3',
       data: {
@@ -43,9 +49,9 @@ exports.main = async (event) => {
         openid: OPENID
       }
     }).then(result => {
-      console.log('MP3 conversion triggered:', result);
+      console.log('Audio conversion triggered:', result);
     }).catch(err => {
-      console.error('Failed to trigger MP3 conversion:', err);
+      console.error('Failed to trigger audio conversion:', err);
     });
 
     return {
