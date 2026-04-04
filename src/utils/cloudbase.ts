@@ -69,6 +69,7 @@ export type NotebookUserProfile = {
   openid: string;
   nickName?: string;
   avatarUrl?: string;
+  avatarFileID?: string;
   gender?: number;
   country?: string;
   province?: string;
@@ -82,7 +83,7 @@ export type NotebookUserProfile = {
 
 type UserProfilePayload = Pick<
   NotebookUserProfile,
-  "nickName" | "avatarUrl" | "gender" | "country" | "province" | "city" | "language"
+  "nickName" | "avatarUrl" | "avatarFileID" | "gender" | "country" | "province" | "city" | "language"
 >;
 
 export async function callCloudFunction<T = any>(params: CallFunctionParams) {
@@ -331,6 +332,18 @@ export async function getUserProfile() {
   }
 }
 
+export async function refreshUserStorageUsage() {
+  try {
+    return await callCloudFunction<{ success: boolean; usedSpace?: number; totalSpace?: number; error?: string }>({
+      name: "refreshUserStorageUsage",
+      data: {}
+    });
+  } catch (error) {
+    console.error('调用 refreshUserStorageUsage 云函数失败:', error);
+    throw error;
+  }
+}
+
 /**
  * 使用微信授权资料更新当前用户信息
  */
@@ -373,6 +386,7 @@ export default {
   callCloudFunction,
   initUser,
   getUserProfile,
+  refreshUserStorageUsage,
   signInWithOtp,
   signInWithPassword,
   signInWithPhoneAuth,

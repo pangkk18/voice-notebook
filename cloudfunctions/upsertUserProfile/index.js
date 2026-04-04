@@ -12,6 +12,7 @@ function pickUserInfo(userInfo = {}) {
   return {
     nickName: userInfo.nickName || '',
     avatarUrl: userInfo.avatarUrl || '',
+    avatarFileID: userInfo.avatarFileID || '',
     gender: typeof userInfo.gender === 'number' ? userInfo.gender : null,
     country: userInfo.country || '',
     province: userInfo.province || '',
@@ -26,6 +27,7 @@ function sanitizeUser(doc, openid) {
     openid,
     nickName: doc?.nickName || '',
     avatarUrl: doc?.avatarUrl || '',
+    avatarFileID: doc?.avatarFileID || '',
     gender: doc?.gender ?? null,
     country: doc?.country || '',
     province: doc?.province || '',
@@ -86,6 +88,16 @@ exports.main = async (event) => {
           OPENID
         )
       };
+    }
+
+    if (doc?.avatarFileID && userInfo.avatarFileID && doc.avatarFileID !== userInfo.avatarFileID) {
+      try {
+        await cloud.deleteFile({
+          fileList: [doc.avatarFileID]
+        });
+      } catch (error) {
+        console.warn('delete previous avatar failed:', error);
+      }
     }
 
     await users.doc(doc._id).update({

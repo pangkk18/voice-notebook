@@ -1,5 +1,4 @@
 const cloud = require('wx-server-sdk');
-const CloudBaseManager = require('@cloudbase/manager-node');
 
 cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
@@ -8,9 +7,6 @@ cloud.init({
 const db = cloud.database();
 const users = db.collection('users');
 const DEFAULT_TOTAL_SPACE = 1024 * 1024 * 1024;
-const STORAGE_SECRET_ID = process.env.CLOUDBASE_SECRETID || '';
-const STORAGE_SECRET_KEY = process.env.CLOUDBASE_SECRETKEY || '';
-const STORAGE_ENV_ID = process.env.CLOUDBASE_ENV_ID || cloud.DYNAMIC_CURRENT_ENV;
 
 function sanitizeUser(doc, openid) {
   return {
@@ -18,6 +14,7 @@ function sanitizeUser(doc, openid) {
     openid,
     nickName: doc?.nickName || '',
     avatarUrl: doc?.avatarUrl || '',
+    avatarFileID: doc?.avatarFileID || '',
     gender: doc?.gender ?? null,
     country: doc?.country || '',
     province: doc?.province || '',
@@ -30,75 +27,24 @@ function sanitizeUser(doc, openid) {
   };
 }
 
-function createStorageManager() {
-  if (!STORAGE_SECRET_ID || !STORAGE_SECRET_KEY) {
-    throw new Error('MISSING_STORAGE_MANAGER_CREDENTIALS');
+async function resolveAvatarUrl(doc) {
+  const avatarFileID = doc?.avatarFileID || '';
+  const rawAvatarUrl = doc?.avatarUrl || '';
+  const fileID = avatarFileID || (String(rawAvatarUrl).startsWith('cloud://') ? rawAvatarUrl : '');
+
+  if (!fileID) {
+    return String(rawAvatarUrl).startsWith('wxfile://') ? '' : rawAvatarUrl;
   }
 
-  const app = new CloudBaseManager({
-    secretId: STORAGE_SECRET_ID,
-    secretKey: STORAGE_SECRET_KEY,
-    envId: STORAGE_ENV_ID
-  });
-
-  return app.storage;
-}
-
-function normalizeStorageFiles(result) {
-  if (Array.isArray(result)) {
-    return result;
+  try {
+    const result = await cloud.getTempFileURL({
+      fileList: [{ fileID, maxAge: 3600 }]
+    });
+    return result?.fileList?.[0]?.tempFileURL || '';
+  } catch (error) {
+    console.warn('resolve avatar temp url failed:', error);
+    return '';
   }
-
-  if (Array.isArray(result?.Files)) {
-    return result.Files;
-  }
-
-  if (Array.isArray(result?.files)) {
-    return result.files;
-  }
-
-  if (Array.isArray(result?.fileList)) {
-    return result.fileList;
-  }
-
-  return [];
-}
-
-function getFilePath(file) {
-  return String(file?.Key || file?.key || file?.cloudPath || file?.path || '');
-}
-
-function getFileSize(file) {
-  const raw = file?.Size ?? file?.size ?? file?.Length ?? 0;
-  return Number(raw) || 0;
-}
-
-function shouldCountFile(openid, file) {
-  const filePath = getFilePath(file);
-
-  if (!filePath) {
-    return false;
-  }
-
-  if (filePath === `${openid}/.init` || filePath.endsWith('/.init')) {
-    return false;
-  }
-
-  return true;
-}
-
-async function calculateUserStorageUsage(openid) {
-  const storage = createStorageManager();
-  const listResult = await storage.listDirectoryFiles(`${openid}/`);
-  const files = normalizeStorageFiles(listResult);
-
-  return files.reduce((total, file) => {
-    if (!shouldCountFile(openid, file)) {
-      return total;
-    }
-
-    return total + getFileSize(file);
-  }, 0);
 }
 
 exports.main = async () => {
@@ -135,23 +81,13 @@ exports.main = async () => {
       };
     }
 
-    const usedSpace = await calculateUserStorageUsage(OPENID);
-    const totalSpace = doc?.totalSpace ?? DEFAULT_TOTAL_SPACE;
-
-    if (doc?._id) {
-      await users.doc(doc._id).update({
-        data: {
-          usedSpace,
-          updatedAt: now
-        }
-      });
-    }
+    const avatarUrl = await resolveAvatarUrl(doc);
 
     doc = {
       ...doc,
-      totalSpace,
-      usedSpace,
-      updatedAt: now
+      avatarUrl,
+      totalSpace: doc?.totalSpace ?? DEFAULT_TOTAL_SPACE,
+      usedSpace: doc?.usedSpace ?? 0
     };
 
     return {

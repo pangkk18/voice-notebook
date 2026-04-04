@@ -51,7 +51,8 @@
 			<view class="progress-bar">
 				<view class="progress" :style="{ width: `${storagePercentage}%` }"></view>
 			</view>
-			<text class="storage-caption">容量由云端实时统计，包含当前账号目录下的录音与转码产物占用。</text>
+			<text class="storage-caption">容量优先展示缓存结果，进入页面后会在后台静默刷新。</text>
+			<text v-if="storageRefreshing" class="storage-refresh-hint">正在后台刷新容量...</text>
 		</view>
 
 		<view class="menu-list">
@@ -116,6 +117,7 @@ import { computed, ref } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import {
 	getUserProfile as fetchUserProfile,
+	refreshUserStorageUsage,
 	upsertUserProfile,
 	type NotebookUserProfile
 } from '@/utils/cloudbase';
@@ -126,6 +128,7 @@ const authorizing = ref(false);
 const showEditor = ref(false);
 const draftAvatarUrl = ref('');
 const draftNickName = ref('');
+const storageRefreshing = ref(false);
 
 const hasAuthorizedProfile = computed(() => {
 	return Boolean(user.value?.nickName && user.value?.avatarUrl);
@@ -162,6 +165,7 @@ async function loadUserProfile() {
 		}
 
 		user.value = result.user;
+		void refreshStorageUsageInBackground();
 	} catch (error) {
 		console.error('加载用户资料失败:', error);
 		uni.showToast({
@@ -170,6 +174,31 @@ async function loadUserProfile() {
 		});
 	} finally {
 		loading.value = false;
+	}
+}
+
+async function refreshStorageUsageInBackground() {
+	if (storageRefreshing.value) {
+		return;
+	}
+
+	storageRefreshing.value = true;
+
+	try {
+		const result = await refreshUserStorageUsage();
+		if (!result?.success || !user.value) {
+			return;
+		}
+
+		user.value = {
+			...user.value,
+			usedSpace: result.usedSpace ?? user.value.usedSpace ?? 0,
+			totalSpace: result.totalSpace ?? user.value.totalSpace ?? 0
+		};
+	} catch (error) {
+		console.warn('后台刷新容量失败:', error);
+	} finally {
+		storageRefreshing.value = false;
 	}
 }
 
@@ -221,8 +250,10 @@ async function submitProfile() {
 	authorizing.value = true;
 
 	try {
+		const uploadedAvatar = await uploadAvatarIfNeeded(draftAvatarUrl.value);
 		const result = await upsertUserProfile({
-			avatarUrl: draftAvatarUrl.value,
+			avatarUrl: uploadedAvatar.avatarUrl,
+			avatarFileID: uploadedAvatar.avatarFileID,
 			nickName: draftNickName.value.trim()
 		});
 
@@ -246,6 +277,37 @@ async function submitProfile() {
 	} finally {
 		authorizing.value = false;
 	}
+}
+
+async function uploadAvatarIfNeeded(avatarUrl: string) {
+	const nextAvatarUrl = String(avatarUrl || '').trim();
+	if (!nextAvatarUrl) {
+		throw new Error('avatarUrl is required');
+	}
+
+	if (!nextAvatarUrl.startsWith('wxfile://')) {
+		return {
+			avatarUrl: nextAvatarUrl,
+			avatarFileID: user.value?.avatarFileID || ''
+		};
+	}
+
+	if (!wx?.cloud?.uploadFile) {
+		throw new Error('wx.cloud.uploadFile not available');
+	}
+
+	const extensionMatch = nextAvatarUrl.match(/\.([a-zA-Z0-9]+)$/);
+	const extension = extensionMatch?.[1] || 'jpg';
+	const cloudPath = `profile-avatar/avatar_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+	const uploadRes = await wx.cloud.uploadFile({
+		cloudPath,
+		filePath: nextAvatarUrl
+	});
+
+	return {
+		avatarUrl: uploadRes.fileID || '',
+		avatarFileID: uploadRes.fileID || ''
+	};
 }
 
 function showPending(label: string) {
@@ -448,6 +510,13 @@ function formatBytes(bytes: number) {
 	font-size: 22rpx;
 	line-height: 1.6;
 	color: $vn-text-muted;
+}
+
+.storage-refresh-hint {
+	display: block;
+	margin-top: 10rpx;
+	font-size: 20rpx;
+	color: $vn-text-soft;
 }
 
 .menu-list {

@@ -43,7 +43,7 @@ onHide(() => {
 
 /* 全局样式 */
 page {
-  background-color: #f5f5f5;
+  background-color: #f4efe6;
 }
 
 /* 通用按钮样式 */

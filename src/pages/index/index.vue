@@ -4,7 +4,7 @@
 		<view v-if="!isRecording" class="content-wrapper">
 			<view class="streak-chip">
 				<i class="iconfont icon-fire fire-icon"></i>
-				<text>{{ streak }} days streak</text>
+				<text>连续{{ streak }}天记录</text>
 			</view>
 
 			<text class="greeting">{{ greeting }}</text>
@@ -51,6 +51,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import { callCloudFunction } from '../../utils/cloudbase';
 
 // --- State ---
@@ -163,6 +164,92 @@ const handleFlagClick = () => {
 	uni.showToast({ title: '已标记', icon: 'none' });
 	// TODO: Implement flag logic
 };
+
+function normalizeDate(raw) {
+	if (!raw) return null
+	if (raw instanceof Date) return raw
+	if (typeof raw === 'string' || typeof raw === 'number') {
+		const date = new Date(raw)
+		return Number.isNaN(date.getTime()) ? null : date
+	}
+	if (typeof raw === 'object') {
+		if (raw.$date) {
+			const date = new Date(raw.$date)
+			return Number.isNaN(date.getTime()) ? null : date
+		}
+		if (raw._seconds) {
+			return new Date(raw._seconds * 1000)
+		}
+		if (raw.seconds) {
+			return new Date(raw.seconds * 1000)
+		}
+	}
+	return null
+}
+
+function toLocalDateKey(date) {
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, '0')
+	const day = String(date.getDate()).padStart(2, '0')
+	return `${year}-${month}-${day}`
+}
+
+function calculateStreakFromDates(dateKeys) {
+	if (!dateKeys.length) return 0
+
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+
+	let cursor = new Date(today)
+	let streakCount = 0
+
+	while (dateKeys.has(toLocalDateKey(cursor))) {
+		streakCount += 1
+		cursor.setDate(cursor.getDate() - 1)
+	}
+
+	return streakCount
+}
+
+function updateHomeSummary(records = []) {
+	const uniqueDateKeys = new Set()
+
+	records.forEach((item) => {
+		const createdAt = normalizeDate(item?.create_time)
+		if (!createdAt) return
+		uniqueDateKeys.add(toLocalDateKey(createdAt))
+	})
+
+	const todayKey = toLocalDateKey(new Date())
+	isRecordedToday.value = uniqueDateKeys.has(todayKey)
+	streak.value = calculateStreakFromDates(uniqueDateKeys)
+
+	if (isRecordedToday.value) {
+		subtitle.value = streak.value > 1 ? `你已经连续打卡 ${streak.value} 天，继续保持。` : '今天已经完成打卡，明天继续保持。'
+	} else if (streak.value > 0) {
+		subtitle.value = `你已经连续打卡 ${streak.value} 天，今天也别中断。`
+	} else {
+		subtitle.value = '准备好了么，开始今天的打卡?'
+	}
+}
+
+async function loadHomeSummary() {
+	try {
+		const result = await callCloudFunction({
+			name: 'getNotebookList',
+			data: { limit: 365 }
+		})
+
+		if (!result?.success) {
+			throw new Error(result?.error || 'getNotebookList failed')
+		}
+
+		const records = Array.isArray(result.data) ? result.data : []
+		updateHomeSummary(records)
+	} catch (error) {
+		console.error('Load home summary failed:', error)
+	}
+}
 
 function getRMS(frameBuffer) {
   // Some frames may have odd byteLength; use DataView for safe int16 reads
@@ -462,6 +549,10 @@ onMounted(() => {
 		stopTimer();
 	});
 });
+
+onShow(() => {
+	loadHomeSummary()
+})
 
 onUnmounted(() => {
 	stopTimer();
