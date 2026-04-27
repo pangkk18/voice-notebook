@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-- 目标平台：微信小程序为主，保留 uni-app 多端构建能力
+- 目标：微信小程序为主，主要是验证腾讯CloudBase一些基础能力
 - 核心能力：录音打卡、录音上传、录音列表、详情查看、音频播放
 - 后端能力：CloudBase 鉴权、云函数、文档型数据库、云存储
 
@@ -24,7 +24,6 @@
 - `createNotebookRecord`：创建录音记录
 - `updateNotebookUpload`：更新上传结果并触发转码
 - `getNotebookList`：获取当前用户录音列表
-- `getHlsPlayableManifest`：生成可播放的 HLS 清单
 - `convertAudioToMp3`：处理音频转码
 
 ## 开发说明

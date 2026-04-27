@@ -1041,7 +1041,7 @@ onUnload(() => {
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/notebook-theme.scss";
+@use "@/styles/notebook-theme.scss" as *;
 
 .player-page {
   position: relative;

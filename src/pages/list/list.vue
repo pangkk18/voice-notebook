@@ -162,7 +162,7 @@ onShow(() => {
 </script>
 
 <style lang="scss">
-@import "@/styles/notebook-theme.scss";
+@use "@/styles/notebook-theme.scss" as *;
 
 .list-container {
 	min-height: 100vh;

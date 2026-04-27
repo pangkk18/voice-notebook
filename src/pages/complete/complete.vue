@@ -14,7 +14,7 @@ const goBack = () => {
 </script>
 
 <style lang="scss">
-@import "@/styles/notebook-theme.scss";
+@use "@/styles/notebook-theme.scss" as *;
 
 .placeholder-container {
   display: flex;

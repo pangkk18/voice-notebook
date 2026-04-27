@@ -63,19 +63,47 @@
 				</view>
 				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
 			</view>
-			<view class="menu-item" @click="showPending('导出全部录音')">
+			<view class="menu-item" @click="openAboutPanel">
 				<view>
-					<text class="menu-item-text">导出全部录音</text>
-					<text class="menu-item-subtext">后续可在这里汇总并导出个人录音打卡内容。</text>
+					<text class="menu-item-text">关于我们</text>
+					<text class="menu-item-subtext">查看项目状态、使用说明与后续策略。</text>
 				</view>
 				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
 			</view>
-			<view class="menu-item" @click="showPending('关于我们')">
-				<view>
-					<text class="menu-item-text">关于我们</text>
-					<text class="menu-item-subtext">查看产品说明与版本信息。</text>
+		</view>
+
+		<view v-if="showAbout" class="about-mask" @click="closeAboutPanel">
+			<view class="about-panel" @click.stop>
+				<text class="about-panel__eyebrow">ABOUT VOICE NOTEBOOK</text>
+				<view class="about-panel__hero">
+					<text class="about-panel__title">关于我们</text>
+					<text class="about-panel__lead">
+						录音打卡小程序当前是一个非商业项目，尚未进入实际运营阶段，主要用于产品打样、技术验证与学习交流。
+					</text>
 				</view>
-				<image class="menu-item-arrow" src="/static/icons/arrow-right.svg" />
+
+				<view class="about-grid">
+					<view class="about-note about-note--accent">
+						<text class="about-note__label">当前状态</text>
+						<text class="about-note__text">
+							现阶段更偏向个人实验与经验沉淀，不承诺长期稳定运营，也不会按商业产品标准提供持续服务。
+						</text>
+					</view>
+					<view class="about-note">
+						<text class="about-note__label">学习交流</text>
+						<text class="about-note__text">
+							项目保留录音、列表、播放与资料同步等完整链路，更多是为了验证小程序与 CloudBase 的组合能力。
+						</text>
+					</view>
+					<view class="about-note about-note--full">
+						<text class="about-note__label">后续策略</text>
+						<text class="about-note__text">
+							后续会根据实际使用量、云存储与转码等服务成本的稳定情况，逐步评估是否需要做配额、功能开放范围或资源策略上的调整。
+						</text>
+					</view>
+				</view>
+
+				<button class="about-panel__button" @click="closeAboutPanel">我知道了</button>
 			</view>
 		</view>
 
@@ -126,6 +154,7 @@ const user = ref<NotebookUserProfile | null>(null);
 const loading = ref(false);
 const authorizing = ref(false);
 const showEditor = ref(false);
+const showAbout = ref(false);
 const draftAvatarUrl = ref('');
 const draftNickName = ref('');
 const storageRefreshing = ref(false);
@@ -214,6 +243,14 @@ function closeProfileEditor() {
 	}
 
 	showEditor.value = false;
+}
+
+function openAboutPanel() {
+	showAbout.value = true;
+}
+
+function closeAboutPanel() {
+	showAbout.value = false;
 }
 
 function handleChooseAvatar(event: any) {
@@ -332,7 +369,7 @@ function formatBytes(bytes: number) {
 </script>
 
 <style lang="scss">
-@import "@/styles/notebook-theme.scss";
+@use "@/styles/notebook-theme.scss" as *;
 
 .profile-container {
 	min-height: 100vh;
@@ -450,7 +487,8 @@ function formatBytes(bytes: number) {
 }
 
 .storage-card,
-.menu-list {
+.menu-list,
+.about-panel {
 	border-radius: 28rpx;
 	border: 2rpx solid $vn-border;
 	background: $vn-surface;
@@ -559,6 +597,110 @@ function formatBytes(bytes: number) {
 	width: 28rpx;
 	height: 28rpx;
 	opacity: 0.7;
+}
+
+.about-mask {
+	position: fixed;
+	inset: 0;
+	z-index: 18;
+	display: flex;
+	align-items: flex-end;
+	padding: 24rpx;
+	background: rgba(31, 26, 23, 0.42);
+}
+
+.about-panel {
+	width: 100%;
+	padding: 28rpx 28rpx calc(34rpx + env(safe-area-inset-bottom));
+	background:
+		linear-gradient(180deg, rgba(253, 251, 247, 0.98) 0%, rgba(247, 241, 232, 0.98) 100%);
+	box-shadow: 0 -16rpx 48rpx rgba(31, 26, 23, 0.12);
+}
+
+.about-panel__eyebrow {
+	display: block;
+	margin-bottom: 12rpx;
+	font-size: 20rpx;
+	letter-spacing: 4rpx;
+	color: $vn-secondary;
+}
+
+.about-panel__hero {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 12rpx;
+	margin-bottom: 24rpx;
+}
+
+.about-panel__title {
+	display: inline-block;
+	padding-right: 24rpx;
+	font-family: Georgia, 'Times New Roman', serif;
+	font-size: 42rpx;
+	line-height: 1.1;
+	color: $vn-text;
+	border-bottom: 2rpx solid rgba(140, 90, 60, 0.28);
+}
+
+.about-panel__lead {
+	width: 88%;
+	margin-left: 22rpx;
+	font-size: 25rpx;
+	line-height: 1.8;
+	color: $vn-text-muted;
+}
+
+.about-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 18rpx;
+}
+
+.about-note {
+	padding: 22rpx;
+	border: 2rpx solid rgba(35, 49, 43, 0.08);
+	border-radius: 24rpx;
+	background: rgba(255, 255, 255, 0.52);
+
+	&--accent {
+		background: rgba(216, 195, 165, 0.26);
+		transform: translateY(10rpx);
+	}
+
+	&--full {
+		grid-column: 1 / -1;
+		margin-left: 28rpx;
+		background: rgba(140, 90, 60, 0.08);
+	}
+}
+
+.about-note__label {
+	display: block;
+	margin-bottom: 10rpx;
+	font-size: 20rpx;
+	letter-spacing: 3rpx;
+	color: $vn-secondary;
+}
+
+.about-note__text {
+	display: block;
+	font-size: 24rpx;
+	line-height: 1.8;
+	color: $vn-text;
+}
+
+.about-panel__button {
+	height: 90rpx;
+	margin-top: 24rpx;
+	border-radius: 22rpx;
+	background: $vn-primary;
+	color: $vn-bg-soft;
+	font-size: 28rpx;
+}
+
+.about-panel__button::after {
+	border: none;
 }
 
 .profile-editor-mask {

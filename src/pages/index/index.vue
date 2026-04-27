@@ -11,10 +11,11 @@
 			<text class="subtitle">{{ subtitle }}</text>
 
 			<view class="recording-area">
-				<view class="record-button" @click="handleRecordClick">
+				<view class="record-button" :class="{ 'is-disabled': isDailyLimitReached }" @click="handleRecordClick">
 					<i class="iconfont icon-mic record-icon"></i>
 				</view>
 				<text class="record-prompt">{{ tapToStartMessage }}</text>
+				<text class="record-quota">{{ todayQuotaMessage }}</text>
 				<view class="waveform">
 					<view class="wave" v-for="w in staticWaves" :key="w.index" :style="{height: `${w.height}px`}">
 					</view>
@@ -56,13 +57,18 @@ import { callCloudFunction } from '../../utils/cloudbase';
 
 // --- State ---
 const isRecordedToday = ref(false);
+const todayRecordCount = ref(0);
 const isRecording = ref(false);
 const streak = ref(5);
 const elapsedTime = ref('00:00');
 let timerInterval = null;
 let seconds = 0;
 let recorderManager = null;
+let isStoppingRecording = false;
 const MIN_WAVE_AMP = 5;
+const DAILY_RECORD_LIMIT = 3;
+const MAX_RECORD_SECONDS = 20 * 60;
+const MAX_RECORD_DURATION_MS = MAX_RECORD_SECONDS * 1000;
 const waveAmplitudes = ref(new Array(30).fill(MIN_WAVE_AMP));
 const WAV_SAMPLE_RATE = 16000
 const WAV_CHANNELS = 1
@@ -92,8 +98,13 @@ const greeting = computed(() => {
 	}
 });
 const subtitle = ref("准备好了么，开始今天的打卡?");
+const isDailyLimitReached = computed(() => todayRecordCount.value >= DAILY_RECORD_LIMIT);
 const tapToStartMessage = computed(() => {
-	return isRecordedToday.value ? '今日已打卡' : '轻点开始录制';
+	return isDailyLimitReached.value ? '今日录制次数已用完' : '轻点开始录制';
+});
+const todayQuotaMessage = computed(() => {
+	const count = Math.min(todayRecordCount.value, DAILY_RECORD_LIMIT);
+	return `今日已录制 ${count}/${DAILY_RECORD_LIMIT} 条 · 单条最长20分钟`;
 });
 
 
@@ -106,6 +117,9 @@ const startTimer = () => {
 		const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
 		const secs = (seconds % 60).toString().padStart(2, '0');
 		elapsedTime.value = `${mins}:${secs}`;
+		if (seconds >= MAX_RECORD_SECONDS) {
+			stopRecording({ reachedTimeLimit: true });
+		}
 	}, 1000);
 };
 
@@ -117,6 +131,15 @@ const stopTimer = () => {
 };
 
 const handleRecordClick = () => {
+	if (isDailyLimitReached.value) {
+		uni.showToast({
+			title: '今天最多录制3条',
+			icon: 'none'
+		});
+		return;
+	}
+
+	isStoppingRecording = false;
 	isRecording.value = true;
 	startTimer();
 	uni.setNavigationBarTitle({
@@ -124,7 +147,7 @@ const handleRecordClick = () => {
 	});
 	if (recorderManager) {
 		recorderManager.start({
-			duration: 600000, // 10 minutes
+			duration: MAX_RECORD_DURATION_MS,
 			sampleRate: 16000,
 			numberOfChannels: 1,
 			// Use PCM so onFrameRecorded provides raw audio frames
@@ -136,21 +159,36 @@ const handleRecordClick = () => {
 	}
 };
 
-const handleStopClick = () => {
+function stopRecording(options = {}) {
+	if (isStoppingRecording) return;
+	isStoppingRecording = true;
+
 	isRecording.value = false;
 	isRecordedToday.value = true;
+	todayRecordCount.value = Math.min(todayRecordCount.value + 1, DAILY_RECORD_LIMIT);
 	pendingRecordingInfo.value = {
 		duration: elapsedTime.value,
 		title: `录音 ${formatFileTime(new Date())}`,
 		date: formatDisplayTime(new Date())
 	}
 	stopTimer();
+	if (options.reachedTimeLimit) {
+		uni.showToast({
+			title: '已达到20分钟上限，录音已自动结束',
+			icon: 'none',
+			duration: 2600
+		});
+	}
 	if (recorderManager) {
 		recorderManager.stop();
 	}
 	uni.setNavigationBarTitle({
 		title: '首页'
 	});
+}
+
+const handleStopClick = () => {
+	stopRecording();
 };
 
 const handlePauseClick = () => {
@@ -213,18 +251,26 @@ function calculateStreakFromDates(dateKeys) {
 
 function updateHomeSummary(records = []) {
 	const uniqueDateKeys = new Set()
+	let nextTodayRecordCount = 0
 
 	records.forEach((item) => {
 		const createdAt = normalizeDate(item?.create_time)
 		if (!createdAt) return
-		uniqueDateKeys.add(toLocalDateKey(createdAt))
+		const dateKey = toLocalDateKey(createdAt)
+		uniqueDateKeys.add(dateKey)
+		if (dateKey === toLocalDateKey(new Date())) {
+			nextTodayRecordCount += 1
+		}
 	})
 
 	const todayKey = toLocalDateKey(new Date())
-	isRecordedToday.value = uniqueDateKeys.has(todayKey)
+	todayRecordCount.value = nextTodayRecordCount
+	isRecordedToday.value = todayRecordCount.value > 0
 	streak.value = calculateStreakFromDates(uniqueDateKeys)
 
-	if (isRecordedToday.value) {
+	if (isDailyLimitReached.value) {
+		subtitle.value = '今天的3条录音已完成，明天再继续记录。'
+	} else if (isRecordedToday.value) {
 		subtitle.value = streak.value > 1 ? `你已经连续打卡 ${streak.value} 天，继续保持。` : '今天已经完成打卡，明天继续保持。'
 	} else if (streak.value > 0) {
 		subtitle.value = `你已经连续打卡 ${streak.value} 天，今天也别中断。`
@@ -457,6 +503,32 @@ onMounted(() => {
 
 	recorderManager.onStop((res) => {
 		console.log('Recorder stopped:', res);
+		if (isRecording.value) {
+			const stoppedAtLimit = seconds >= MAX_RECORD_SECONDS ||
+				Number(res?.duration || 0) >= MAX_RECORD_DURATION_MS - 1000
+			stopTimer()
+			isRecording.value = false
+			uni.setNavigationBarTitle({
+				title: '首页'
+			})
+			if (!pendingRecordingInfo.value) {
+				pendingRecordingInfo.value = {
+					duration: stoppedAtLimit ? '20:00' : elapsedTime.value,
+					title: `录音 ${formatFileTime(new Date())}`,
+					date: formatDisplayTime(new Date())
+				}
+			}
+			if (stoppedAtLimit) {
+				todayRecordCount.value = Math.min(todayRecordCount.value + 1, DAILY_RECORD_LIMIT)
+				isRecordedToday.value = true
+				uni.showToast({
+					title: '已达到20分钟上限，录音已自动结束',
+					icon: 'none',
+					duration: 2600
+				})
+			}
+		}
+		isStoppingRecording = false
 		// Reset waveform on stop
 		waveAmplitudes.value = new Array(30).fill(12);
 		rmsPeak = 0
@@ -470,6 +542,7 @@ onMounted(() => {
 				saveRecordingToNotebook(snapshot, wavPath, 'audio/wav').then((recordId) => {
 					console.log('Notebook record saved:', recordId)
 					pendingRecordingInfo.value = null
+					loadHomeSummary()
 					uploadRecordingToCloud(wavPath).then((uploadRes) => {
 						console.log('Uploaded:', uploadRes)
 						updateNotebookUploadInfo(recordId, uploadRes.fileID, uploadRes.cloudPath).then(() => {
@@ -491,6 +564,7 @@ onMounted(() => {
 				}).catch((err) => {
 					console.error('Save notebook data failed:', err)
 					pendingRecordingInfo.value = null
+					loadHomeSummary()
 					uni.showToast({
 						title: '录音信息保存失败',
 						icon: 'none'
@@ -500,6 +574,7 @@ onMounted(() => {
 				console.error('Save WAV failed:', err)
 				openPlayerPage(pendingRecordingInfo.value, '', res.tempFilePath)
 				pendingRecordingInfo.value = null
+				loadHomeSummary()
 				uni.showToast({
 					title: '保存失败',
 					icon: 'none'
@@ -508,6 +583,7 @@ onMounted(() => {
 		} else {
 			openPlayerPage(pendingRecordingInfo.value, '', '')
 			pendingRecordingInfo.value = null
+			loadHomeSummary()
 			uni.showToast({
 				title: '保存失败',
 				icon: 'none'
@@ -546,6 +622,7 @@ onMounted(() => {
 			icon: 'none'
 		});
 		isRecording.value = false;
+		isStoppingRecording = false;
 		stopTimer();
 	});
 });
@@ -565,7 +642,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss">
-	@import "@/styles/notebook-theme.scss";
+	@use "@/styles/notebook-theme.scss" as *;
 
 	.home-container {
 		display: flex;
@@ -656,6 +733,11 @@ onUnmounted(() => {
 			background-color: $vn-secondary;
 			box-shadow: 0 5px 15px rgba(122, 142, 118, 0.3);
 		}
+
+		&.is-disabled {
+			background-color: $vn-text-soft;
+			box-shadow: none;
+		}
 	}
 	
 	.record-prompt {
@@ -663,6 +745,12 @@ onUnmounted(() => {
 		color: $vn-text-muted;
 		margin-top: 44px;
 		letter-spacing: 1px;
+	}
+
+	.record-quota {
+		font-size: 12px;
+		color: $vn-text-soft;
+		margin-top: 8px;
 	}
 
 	.waveform {
