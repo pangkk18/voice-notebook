@@ -67,8 +67,9 @@ let recorderManager = null;
 let isStoppingRecording = false;
 const MIN_WAVE_AMP = 5;
 const DAILY_RECORD_LIMIT = 3;
-const MAX_RECORD_SECONDS = 20 * 60;
+const MAX_RECORD_SECONDS = 10 * 60;
 const MAX_RECORD_DURATION_MS = MAX_RECORD_SECONDS * 1000;
+const RECORD_PERMISSION_SCOPE = 'scope.record';
 const waveAmplitudes = ref(new Array(30).fill(MIN_WAVE_AMP));
 const WAV_SAMPLE_RATE = 16000
 const WAV_CHANNELS = 1
@@ -104,7 +105,7 @@ const tapToStartMessage = computed(() => {
 });
 const todayQuotaMessage = computed(() => {
 	const count = Math.min(todayRecordCount.value, DAILY_RECORD_LIMIT);
-	return `今日已录制 ${count}/${DAILY_RECORD_LIMIT} 条 · 单条最长20分钟`;
+	return `今日已录制 ${count}/${DAILY_RECORD_LIMIT} 条 · 单条最长10分钟`;
 });
 
 
@@ -130,10 +131,203 @@ const stopTimer = () => {
 	}
 };
 
-const handleRecordClick = () => {
+function getRecorderManagerInstance() {
+	if (typeof wx !== 'undefined' && typeof wx.getRecorderManager === 'function') {
+		return wx.getRecorderManager();
+	}
+	return uni.getRecorderManager();
+}
+
+function getWxSetting() {
+	return new Promise((resolve, reject) => {
+		if (typeof wx === 'undefined' || typeof wx.getSetting !== 'function') {
+			resolve({ authSetting: {} });
+			return;
+		}
+		wx.getSetting({
+			success: resolve,
+			fail: reject
+		});
+	});
+}
+
+function authorizeWxScope(scope) {
+	return new Promise((resolve, reject) => {
+		if (typeof wx === 'undefined' || typeof wx.authorize !== 'function') {
+			resolve(true);
+			return;
+		}
+		wx.authorize({
+			scope,
+			success: resolve,
+			fail: reject
+		});
+	});
+}
+
+function getWxPrivacySetting() {
+	return new Promise((resolve, reject) => {
+		if (typeof wx === 'undefined' || typeof wx.getPrivacySetting !== 'function') {
+			resolve({ needAuthorization: false });
+			return;
+		}
+		wx.getPrivacySetting({
+			success: resolve,
+			fail: reject
+		});
+	});
+}
+
+function requireWxPrivacyAuthorize() {
+	return new Promise((resolve, reject) => {
+		if (typeof wx === 'undefined' || typeof wx.requirePrivacyAuthorize !== 'function') {
+			resolve(true);
+			return;
+		}
+		wx.requirePrivacyAuthorize({
+			success: resolve,
+			fail: reject
+		});
+	});
+}
+
+function openWxSetting() {
+	return new Promise((resolve, reject) => {
+		if (typeof wx === 'undefined' || typeof wx.openSetting !== 'function') {
+			resolve(null);
+			return;
+		}
+		wx.openSetting({
+			success: resolve,
+			fail: reject
+		});
+	});
+}
+
+function showPrivacyPermissionModal(privacyContractName = '用户隐私保护指引') {
+	return new Promise((resolve) => {
+		uni.showModal({
+			title: '需要同意隐私保护指引',
+			content: `录音打卡需要使用麦克风，请先同意《${privacyContractName}》。`,
+			confirmText: '继续',
+			cancelText: '取消',
+			success: (res) => resolve(Boolean(res.confirm)),
+			fail: () => resolve(false)
+		});
+	});
+}
+
+function showRecordPermissionModal() {
+	return new Promise((resolve) => {
+		uni.showModal({
+			title: '需要录音权限',
+			content: '录音打卡需要访问麦克风，请在设置中允许录音权限。',
+			confirmText: '去设置',
+			cancelText: '取消',
+			success: (res) => resolve(Boolean(res.confirm)),
+			fail: () => resolve(false)
+		});
+	});
+}
+
+async function ensurePrivacyPermission() {
+	try {
+		const privacySetting = await getWxPrivacySetting();
+		if (!privacySetting?.needAuthorization) {
+			return true;
+		}
+
+		const confirmed = await showPrivacyPermissionModal(privacySetting.privacyContractName);
+		if (!confirmed) {
+			return false;
+		}
+
+		await requireWxPrivacyAuthorize();
+		return true;
+	} catch (error) {
+		console.error('Ensure privacy permission failed:', error);
+		return false;
+	}
+}
+
+async function requestRecordPermissionFromSetting() {
+	const confirmed = await showRecordPermissionModal();
+	if (!confirmed) {
+		return false;
+	}
+
+	const nextSetting = await openWxSetting();
+	return Boolean(nextSetting?.authSetting?.[RECORD_PERMISSION_SCOPE]);
+}
+
+async function ensureRecordPermission() {
+	try {
+		const hasPrivacyPermission = await ensurePrivacyPermission();
+		if (!hasPrivacyPermission) {
+			return false;
+		}
+
+		const setting = await getWxSetting();
+		const authSetting = setting?.authSetting || {};
+		const authState = authSetting[RECORD_PERMISSION_SCOPE];
+
+		if (authState === true) {
+			return true;
+		}
+
+		if (authState === undefined) {
+			try {
+				await authorizeWxScope(RECORD_PERMISSION_SCOPE);
+				return true;
+			} catch (error) {
+				console.error('Authorize record scope failed:', error);
+				const latestSetting = await getWxSetting();
+				if (latestSetting?.authSetting?.[RECORD_PERMISSION_SCOPE] === true) {
+					return true;
+				}
+				return requestRecordPermissionFromSetting();
+			}
+		}
+
+		return requestRecordPermissionFromSetting();
+	} catch (error) {
+		console.error('Ensure record permission failed:', error);
+		return false;
+	}
+}
+
+function getRecorderErrorToast(err) {
+	const errMsg = String(err?.errMsg || err?.message || '');
+	if (errMsg.includes('auth deny') || errMsg.includes('authorize')) {
+		return '请先开启录音权限';
+	}
+	if (errMsg.includes('not supported')) {
+		return '当前设备暂不支持录音';
+	}
+	return '录音失败，请重试';
+}
+
+const handleRecordClick = async () => {
 	if (isDailyLimitReached.value) {
 		uni.showToast({
 			title: '今天最多录制3条',
+			icon: 'none'
+		});
+		return;
+	}
+
+	const hasRecordPermission = await ensureRecordPermission();
+	if (!hasRecordPermission) {
+		uni.showToast({
+			title: '未开启录音权限',
+			icon: 'none'
+		});
+		return;
+	}
+
+	if (!recorderManager) {
+		uni.showToast({
+			title: '录音组件不可用',
 			icon: 'none'
 		});
 		return;
@@ -174,7 +368,7 @@ function stopRecording(options = {}) {
 	stopTimer();
 	if (options.reachedTimeLimit) {
 		uni.showToast({
-			title: '已达到20分钟上限，录音已自动结束',
+			title: '已达到10分钟上限，录音已自动结束',
 			icon: 'none',
 			duration: 2600
 		});
@@ -495,7 +689,11 @@ let lastAmp = 10
 
 // --- Lifecycle Hooks ---
 onMounted(() => {
-	recorderManager = uni.getRecorderManager();
+	recorderManager = getRecorderManagerInstance();
+	if (!recorderManager) {
+		console.error('Recorder manager unavailable');
+		return;
+	}
 
 	recorderManager.onStart(() => {
 		console.log('Recorder started');
@@ -522,7 +720,7 @@ onMounted(() => {
 				todayRecordCount.value = Math.min(todayRecordCount.value + 1, DAILY_RECORD_LIMIT)
 				isRecordedToday.value = true
 				uni.showToast({
-					title: '已达到20分钟上限，录音已自动结束',
+					title: '已达到10分钟上限，录音已自动结束',
 					icon: 'none',
 					duration: 2600
 				})
@@ -618,7 +816,7 @@ onMounted(() => {
 	recorderManager.onError((err) => {
 		console.error('Recorder error:', err);
 		uni.showToast({
-			title: '录音失败，请重试',
+			title: getRecorderErrorToast(err),
 			icon: 'none'
 		});
 		isRecording.value = false;

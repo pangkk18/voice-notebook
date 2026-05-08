@@ -7,7 +7,7 @@ cloud.init({
 const db = cloud.database();
 const _ = db.command;
 const DAILY_RECORD_LIMIT = 3;
-const MAX_RECORD_SECONDS = 20 * 60;
+const MAX_RECORD_SECONDS = 10 * 60;
 const CHINA_TIME_OFFSET = 8 * 60 * 60 * 1000;
 
 function getChinaDayRange(date = new Date()) {
@@ -50,7 +50,7 @@ exports.main = async (event, context) => {
     if (normalizedDuration > MAX_RECORD_SECONDS) {
       return {
         success: false,
-        error: '单条录音最长20分钟'
+        error: '单条录音最长10分钟'
       };
     }
 

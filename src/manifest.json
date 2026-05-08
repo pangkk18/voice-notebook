@@ -55,6 +55,11 @@
         "setting" : {
             "urlCheck" : false
         },
+        "permission" : {
+            "scope.record" : {
+                "desc" : "用于录制每日打卡语音并保存录音"
+            }
+        },
         "usingComponents" : true
     },
     "mp-alipay" : {
